@@ -1,0 +1,12 @@
+name: "exp3"  
+description: "Experiment 03: Left Out Inventories"
+dir: "${base_dir}/experiments/exp3"
+satellite: "s2"
+variant: "refined"
+cluster_dict:
+  america: ["USA_Alaska", "USA_PuertoRico", "DominicaMaria"]
+  europe: ["Italy"]
+  africa: ["Chimanimani"]
+  central_asia: ["China", "Hokkaido", "Hiroshima", "Kyrgyzstan1", "Kyrgyzstan2"]
+  southeast_asia: ["Itogon", "LanaoDelNorte", "Indonesia", "Thrissur", "Nepal"]
+  oceania: ["Newzealand", "PNG"]

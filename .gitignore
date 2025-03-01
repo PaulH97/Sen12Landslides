@@ -1,0 +1,31 @@
+# Ignore all files in the data folder
+data/
+src/scripts/
+
+# Ignore common large files and cache files
+*.log
+*.csv
+*.h5
+*.nc
+*.pkl
+*.npy
+*.tar
+*.zip
+*.gz
+*.7z
+
+
+# Ignore Python cache & virtual environments
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+env/
+
+# Ignore Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Ignore system files
+.DS_Store
+Thumbs.db

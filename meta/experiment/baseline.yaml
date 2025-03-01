@@ -1,0 +1,15 @@
+# experiment/baseline.yaml
+description: "Baseline experiment for dataset testing"
+
+s2:
+  data_path: "${base_dir}/data/refined/s2/data_paths.json"
+  norm_file: "${base_dir}/data/refined/s2/norm_data.json"
+  train_data: "${base_dir}/data/refined/s2/train_data.h5"
+s1asc:
+  data_path: "${base_dir}/data/refined/s1asc/data_paths.json"
+  norm_file: "${base_dir}/data/refined/s1asc/norm_data.json"
+  train_data: "${base_dir}/data/refined/s1asc/train_data.h5"
+s1dsc:
+  data_path: "${base_dir}/data/refined/s1dsc/data_paths.json"
+  norm_file: "${base_dir}/data/refined/s1dsc/norm_data.json"
+  train_data: "${base_dir}/data/refined/s1dsc/train_data.h5"

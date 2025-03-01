@@ -1,0 +1,6 @@
+name: UTAE
+timeseries_len: ${dataset.patch_length}
+num_channels: ${dataset.patch_channels}
+num_classes: 1
+shape: NCTHW
+batch_size: 4

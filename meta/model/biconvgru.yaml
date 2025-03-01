@@ -1,0 +1,6 @@
+name: BiConvGRU
+img_res: ${dataset.patch_size}
+timeseries_len: ${dataset.patch_length}
+num_channels: ${dataset.patch_channels}
+num_classes: 2
+shape: 'NCTHW'

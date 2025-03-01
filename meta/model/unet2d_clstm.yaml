@@ -1,0 +1,7 @@
+name: UNet2D_CLSTM
+train_stage: 2
+shape: 'NCTHW'
+img_res: ${dataset.patch_size}
+timeseries_len: ${dataset.input_length}
+num_channels: ${dataset.input_channels}
+num_classes: 2
