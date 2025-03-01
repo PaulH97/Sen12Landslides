@@ -1,6 +1,5 @@
 name: s1asc
 full_name: sentinel-1asc
-patch_dir: "${base_dir}/data/refined/s1asc/patches"
 list_of_bands: ["VH", "VV", "DEM"]
 patch_size: 128
 patch_length: 15

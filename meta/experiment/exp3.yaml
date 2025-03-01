@@ -2,7 +2,8 @@ name: "exp3"
 description: "Experiment 03: Left Out Inventories"
 dir: "${base_dir}/experiments/exp3"
 satellite: "s2"
-variant: "refined"
+variant: "america" # or one of the keys below
+
 cluster_dict:
   america: ["USA_Alaska", "USA_PuertoRico", "DominicaMaria"]
   europe: ["Italy"]

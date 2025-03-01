@@ -1,6 +1,5 @@
 name: s2
 full_name: sentinel-2
-patch_dir: "${base_dir}/data/refined/s2/patches"
 list_of_bands: ["B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12", "DEM"]
 patch_size: 128
 input_length: 15

@@ -1,0 +1,45 @@
+base_dir: /dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides
+train:
+  gpus: 4
+  precision: 16
+  max_epochs: 50
+  batch_size: 4
+  output_dir: ${base_dir}/results/${model.name}_${experiment.name}_${satellite.name}_${experiment.variant}
+  log_dir: ${base_dir}/results/logs/${model.name}_${experiment.name}_${satellite.name}_${experiment.variant}
+preprocess:
+  test_size: 0.2
+  val_size: 0.2
+  seed: 42
+model:
+  name: UNet3D
+  img_res: ${dataset.patch_size}
+  timeseries_len: ${dataset.input_length}
+  num_channels: ${dataset.input_channels}
+  num_classes: 2
+  shape: NCTHW
+satellite:
+  name: s2
+  full_name: sentinel-2
+  patch_dir: ${base_dir}/data/s2/patches
+  list_of_bands:
+  - B02
+  - B03
+  - B04
+  - B05
+  - B06
+  - B07
+  - B08
+  - B8A
+  - B11
+  - B12
+  - DEM
+  patch_size: 128
+  input_length: 15
+  input_channels: 11
+experiment:
+  name: exp1
+  variant: original
+  description: 'Experiment 01: Original Labels vs. Refined Labels'
+  dir: ${base_dir}/experiments/exp1
+  preprocess:
+    ref_satellite: s2

@@ -4,4 +4,3 @@ dir: "${base_dir}/experiments/exp2"
 variant: "dem" # "dem" or "no_dem"
 preprocess:
   ref_satellite: "s2"
-  ref_variant: "refined"

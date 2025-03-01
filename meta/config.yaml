@@ -4,8 +4,10 @@ defaults:
   - satellite: s2  
   - experiment: exp1 
 
-base_dir: "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landlsides"
-  
+base_dir: "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides"
+
+dataset_type: "final" # or raw
+
 train:
   gpus: 4
   precision: 16
@@ -16,7 +18,7 @@ train:
 
 hydra:
   job:
-    chdir: false  # Prevent Hydra from changing the working directory
+    chdir: false 
 
 preprocess:
   test_size: 0.2
