@@ -20,6 +20,7 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+*.egg-info/
 venv/
 env/
 
@@ -29,3 +30,8 @@ env/
 # Ignore system files
 .DS_Store
 Thumbs.db
+
+# Output directories
+outputs/
+results/
+
