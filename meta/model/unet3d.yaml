@@ -1,6 +1,7 @@
-name: UNet3D
-img_res: ${dataset.patch_size}
-timeseries_len: ${dataset.input_length}
-num_channels: ${dataset.input_channels}
-num_classes: 2
-shape: 'NCTHW'
+name: unet3d
+model:
+  _target_: src.models.UNet3D.unet3d.UNet3D
+  timeseries_len: ${dataset.input_length}
+  num_channels: ${adjust_channels:${dataset.input_channels}, ${experiment.variant}}
+  num_classes: 2
+  dropout: 0.0

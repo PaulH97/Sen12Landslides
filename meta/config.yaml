@@ -1,24 +1,44 @@
+# config.yaml
 defaults:
   - _self_
-  - model: unet3d   
-  - satellite: s2  
-  - experiment: exp1 
+  - experiment: exp1
+  - model: unet3d
+  - dataset: s2
 
+# Global settings (these can be overridden from the command line)
+experiment:
+  variant: final      # default variant (final, raw, dem, no_dem, america)
+
+# Base directory for your project
 base_dir: "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides"
 
-dataset_type: "final" # or raw
+# Data paths based on the experiment configuration
+exp_dir: "${base_dir}/experiments/${experiment.name}/${experiment.variant}/${dataset.name}"
 
+# Training settings
 train:
-  gpus: 4
-  precision: 16
-  max_epochs: 50
+  precision: 16-mixed
+  epochs: 50
   batch_size: 4
-  output_dir: "${base_dir}/results/${model.name}_${experiment.name}_${satellite.name}_${experiment.variant}"
-  log_dir: "${base_dir}/results/logs/${model.name}_${experiment.name}_${satellite.name}_${experiment.variant}"
+  no_data_value: -9999.0
+  h5: false
+  fast_dev_run: true
+  loss:
+    _target_: torch.nn.CrossEntropyLoss # __main__.DC_and_CE_loss
+  optimizer:
+    _target_: torch.optim.Adam
+    lr: 0.001
+  callbacks:
+    _target_: pytorch_lightning.callbacks.ModelCheckpoint
+    monitor: val_loss
+    mode: min
+    save_top_k: 1
+  output_dir: "${base_dir}/results/${model}_${dataset.name}_${experiment.name}_${experiment.variant}"
+  log_dir: "${base_dir}/results/logs/${model}_${dataset.name}_${experiment.name}_${experiment.variant}"
 
 hydra:
   job:
-    chdir: false 
+    chdir: false
 
 preprocess:
   test_size: 0.2

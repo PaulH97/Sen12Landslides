@@ -1,6 +1,7 @@
 name: "exp2"  
 description: "Experiment 02: Multi-Modal Data"
 dir: "${base_dir}/experiments/exp2"
-variant: "dem" # "dem" or "no_dem"
+variant: "dem" # or no_dem
 preprocess:
+  ref_dataset_type: "final"
   ref_satellite: "s2"
