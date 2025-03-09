@@ -14,16 +14,18 @@ exp_dir: ${base_dir}/experiments/${experiment.name}/${experiment.variant}/${data
 log_dir: ${base_dir}/outputs/logs
 output_dir: ${base_dir}/outputs/${experiment.name}/${experiment.variant}/${dataset.name}/${model.name}
 
+# only for training 
 trainer: 
-  accelerator: gpu
+  accelerator: cpu
   strategy: ddp
   devices: 1
   precision: 16-mixed
   max_epochs: 50
+  fast_dev_run: true
   default_root_dir: ${log_dir}
 
 dataset:
-  batch_size: 32
+  batch_size: 1
 
 sanity_check: false
 

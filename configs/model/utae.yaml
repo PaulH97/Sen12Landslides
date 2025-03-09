@@ -1,10 +1,24 @@
+_target_: src.models.lit_module.Sen12LsLitModule
+
 name: utae
-model:
-  _target_: src.models.UTAE.utae.UTAE
-  timeseries_len: ${dataset.patch_length}
-  num_channels: ${dataset.patch_channels}
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 5
+
+net:
+  _target_: src.models.utae.UTAE
+  num_channels: ${adjust_channels:${dataset.patch_channels}, ${experiment.variant}}
   shape_pattern: NCTHW 
-  num_classes: 1
+  num_classes: 2
   batch_size: 4
   encoder_widths: [64, 64, 64, 128]
   decoder_widths: [32, 32, 64, 128]
@@ -20,3 +34,5 @@ model:
   return_maps: False
   pad_value: 0
   padding_mode: reflect
+
+compile: False

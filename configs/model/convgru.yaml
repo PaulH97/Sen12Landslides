@@ -15,10 +15,13 @@ scheduler:
   patience: 5
 
 net:
-  _target_: src.models.BiConvRNN.convgru.ConvGRU_Seg
+  _target_: src.models.convgru.ConvGRU_Seg
   img_res: ${dataset.patch_size}
   timeseries_len: ${dataset.patch_length}
   num_classes: 2
+  kernel_size: [3,3]
+  hidden_dim: 180
+  pad_value: 0
   shape_pattern: 'NCTHW'
 
 compile: False

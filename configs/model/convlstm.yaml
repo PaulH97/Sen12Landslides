@@ -1,4 +1,6 @@
-_target_: src.models.mnist_module.MNISTLitModule
+_target_: src.models.lit_module.Sen12LsLitModule
+
+name: convlstm
 
 optimizer:
   _target_: torch.optim.Adam
@@ -13,10 +15,12 @@ scheduler:
   patience: 5
 
 net:
-  _target_: src.models.BiConvRNN.convlstm.BConvLSTM_Seg
+  _target_: src.models.convlstm.BConvLSTM_Seg
   num_classes: 2
   input_size: ${dataset.patch_size}
-  input_dim: ${dataset.patch_channels}     
+  input_dim: ${adjust_channels:${dataset.patch_channels}, ${experiment.variant}}   
   hidden_dim: 64      
-  kernel_size: 3
+  kernel_size: [3,3]
   pad_value: 0
+
+compile: False

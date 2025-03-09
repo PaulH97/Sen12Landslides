@@ -194,16 +194,16 @@ class ConvGRU(nn.Module):
         return param
 
 class ConvGRU_Seg(nn.Module):
-    def __init__(self, config):
+    def __init__(self, num_classes, img_res, timeseries_len, shape_pattern, kernel_size, hidden_dim, pad_value):
         super(ConvGRU_Seg, self).__init__()
 
-        self.num_classes=config["num_classes"]
-        self.input_size=(config["img_res"], config["img_res"])
-        self.input_dim=config["timeseries_len"]
-        self.shape_pattern = config["shape"]
-        self.kernel_size=(3, 3)
-        self.hidden_dim=180
-        self.pad_value=0
+        self.num_classes = num_classes
+        self.input_size = (img_res, img_res)
+        self.input_dim = timeseries_len
+        self.shape_pattern = shape_pattern
+        self.kernel_size = tuple(kernel_size)
+        self.hidden_dim = hidden_dim
+        self.pad_value = 0
 
         self.convgru_encoder = ConvGRU(
             input_dim=self.input_dim,

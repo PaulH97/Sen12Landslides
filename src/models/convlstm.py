@@ -1,10 +1,11 @@
 """
-Original from  https://github.com/TUM-LMF/MTLCC-pytorch/blob/master/src/models/convlstm/convlstm.py
-Modified from https://github.com/VSainteuf/utae-paps/blob/main/src/backbones/convlstm.py
+Taken from https://github.com/TUM-LMF/MTLCC-pytorch/blob/master/src/models/convlstm/convlstm.py
+authors: TUM-LMF
 """
 import torch.nn as nn
 from torch.autograd import Variable
 import torch
+
 
 class ConvLSTMCell(nn.Module):
     def __init__(self, input_size, input_dim, hidden_dim, kernel_size, bias):
@@ -71,6 +72,7 @@ class ConvLSTMCell(nn.Module):
                 torch.zeros(batch_size, self.hidden_dim, self.height, self.width)
             ).to(device),
         )
+
 
 class ConvLSTM(nn.Module):
     def __init__(
@@ -201,25 +203,31 @@ class ConvLSTM(nn.Module):
             param = [param] * num_layers
         return param
 
+
 class ConvLSTM_Seg(nn.Module):
-    def __init__(
-        self, num_classes, input_size, input_dim, hidden_dim, kernel_size, pad_value=0
-    ):
+    def __init__(self, num_classes, input_size, input_dim, hidden_dim, kernel_size, pad_value=0):
         super(ConvLSTM_Seg, self).__init__()
+
+        self.num_classes = num_classes
+        self.input_size = input_size
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.kernel_size = kernel_size
+        self.pad_value = pad_value
+
         self.convlstm_encoder = ConvLSTM(
-            input_dim=input_dim,
-            input_size=input_size,
-            hidden_dim=hidden_dim,
-            kernel_size=kernel_size,
+            input_dim=self.input_dim,
+            input_size=self.input_size,
+            hidden_dim=self.hidden_dim,
+            kernel_size=self.kernel_size,
             return_all_layers=False,
         )
         self.classification_layer = nn.Conv2d(
-            in_channels=hidden_dim,
-            out_channels=num_classes,
-            kernel_size=kernel_size,
+            in_channels=self.hidden_dim,
+            out_channels=self.num_classes,
+            kernel_size=self.kernel_size,
             padding=1,
         )
-        self.pad_value = pad_value
 
     def forward(self, input, batch_positions=None):
         pad_mask = (
@@ -232,34 +240,40 @@ class ConvLSTM_Seg(nn.Module):
 
         return out
 
+
 class BConvLSTM_Seg(nn.Module):
     def __init__(
-        self, num_classes, input_size, input_dim, hidden_dim, kernel_size, pad_value=0
-    ):
+        self, num_classes, input_size, input_dim, hidden_dim, kernel_size, pad_value):
         super(BConvLSTM_Seg, self).__init__()
+        self.num_classes = num_classes
+        self.input_size = (input_size, input_size)
+        self.input_dim = input_dim
+        self.hidden_dim = hidden_dim
+        self.kernel_size = tuple(kernel_size)
+        self.pad_value = pad_value
+
         self.convlstm_forward = ConvLSTM(
-            input_dim=input_dim,
-            input_size=input_size,
-            hidden_dim=hidden_dim,
-            kernel_size=kernel_size,
+            input_dim=self.input_dim,
+            input_size=self.input_size,
+            hidden_dim=self.hidden_dim,
+            kernel_size=self.kernel_size,
             return_all_layers=False,
         )
         self.convlstm_backward = ConvLSTM(
-            input_dim=input_dim,
-            input_size=input_size,
-            hidden_dim=hidden_dim,
-            kernel_size=kernel_size,
+            input_dim=self.input_dim,
+            input_size=self.input_size,
+            hidden_dim=self.hidden_dim,
+            kernel_size=self.kernel_size,
             return_all_layers=False,
         )
         self.classification_layer = nn.Conv2d(
-            in_channels=2 * hidden_dim,
-            out_channels=num_classes,
-            kernel_size=kernel_size,
+            in_channels=2 * self.hidden_dim,
+            out_channels=self.num_classes,
+            kernel_size=self.kernel_size,
             padding=1,
         )
-        self.pad_value = pad_value
 
-    def forward(self, input, batch_posistions=None):
+    def forward(self, input, batch_positions=None):
         pad_mask = (
             (input == self.pad_value).all(dim=-1).all(dim=-1).all(dim=-1)
         )  # BxT pad mask
@@ -280,6 +294,7 @@ class BConvLSTM_Seg(nn.Module):
         out = torch.cat([out, backward_states[0][1]], dim=1)
         out = self.classification_layer(out)
         return out
+
 
 class BConvLSTM(nn.Module):
     def __init__(self, input_size, input_dim, hidden_dim, kernel_size):

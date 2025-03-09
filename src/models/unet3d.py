@@ -10,8 +10,6 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from benchmarking.helperFunctions import get_params_values
-
 def conv_block(in_dim, middle_dim, out_dim):
     model = nn.Sequential(
         nn.Conv3d(in_dim, middle_dim, kernel_size=3, stride=1, padding=1),
@@ -47,15 +45,15 @@ def up_conv_block(in_dim, out_dim):
     return model
 
 class UNet3D(nn.Module):
-    def __init__(self, config):
+    def __init__(self, num_channels, num_classes, timeseries_len, dropout):
         super(UNet3D, self).__init__()
-        in_channel = get_params_values(config, "num_channels")
-        n_classes = get_params_values(config, "num_classes")
-        self.timesteps = get_params_values(config, "timeseries_len")
-        dropout = get_params_values(config, "dropout", 0.0)
+        self.in_channel = num_channels
+        self.num_classes = num_classes
+        self.timesteps = timeseries_len
+        dropout = dropout
         
         feats = 16
-        self.en3 = conv_block(in_channel, feats * 4, feats * 4)
+        self.en3 = conv_block(self.in_channel, feats * 4, feats * 4)
         self.pool_3 = nn.MaxPool3d(kernel_size=2, stride=2, padding=0)
         self.en4 = conv_block(feats * 4, feats * 8, feats * 8)
         self.pool_4 = nn.MaxPool3d(kernel_size=2, stride=2, padding=0)
@@ -67,7 +65,7 @@ class UNet3D(nn.Module):
         self.trans3 = up_conv_block(feats * 8, feats * 4)
         self.dc3 = conv_block(feats * 8, feats * 4, feats * 2)
         
-        self.final = nn.Conv3d(feats * 2, n_classes, kernel_size=3, stride=1, padding=1)
+        self.final = nn.Conv3d(feats * 2, num_classes, kernel_size=3, stride=1, padding=1)
         self.fn = nn.Linear(self.timesteps, 1)
         self.dropout = nn.Dropout(p=dropout, inplace=True)
     
