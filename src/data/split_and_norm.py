@@ -497,9 +497,9 @@ def build_splits_exp3(cfg, val_size=0.2, seed=42):
 @hydra.main(config_path="../../meta", config_name="config.yaml")
 def main(cfg: DictConfig):
 
-    test_size = cfg.preprocess.test_size
-    val_size = cfg.preprocess.val_size
-    seed = cfg.preprocess.seed
+    test_size = 0.2
+    val_size = 0.2
+    seed = 42
 
     np.random.seed(seed)
 

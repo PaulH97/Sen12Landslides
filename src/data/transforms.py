@@ -22,9 +22,12 @@ class NoDataReplace:
     def __call__(self, sample):
         img = sample["img"]  # expected shape: (T, C, H, W)
         replacement = self.global_means.view(-1, 1, 1).to(img.dtype)
-        T = img.shape[0]
-        for t in range(T):
-            img[t] = torch.where(img[t] != self.nodata_value, img[t], replacement)
+        expanded_replacement = replacement.unsqueeze(0)  # now shape (1, C, 1, 1)
+
+        # Create a mask where either nodata value or nan is found.
+        mask = (img == self.nodata_value) | torch.isnan(img)
+        img = torch.where(mask, expanded_replacement, img)
+
         sample["img"] = img
         return sample
 
@@ -46,12 +49,36 @@ class RandomFlip:
         return sample
 
 class Normalize:
-    def __init__(self, mean, std):
-        self.mean = torch.tensor(mean, dtype=torch.float32).view(1, -1, 1, 1)
-        self.std = torch.tensor(std, dtype=torch.float32).view(1, -1, 1, 1)
+    """
+    Normalize sample["img"] by subtracting mean and dividing by std.
+    Optionally remove one channel (by index) from both the data and stats.
+    
+    :param mean: list/array of channel-wise means
+    :param std:  list/array of channel-wise stds
+    :param rm_channel_idx: None or int. If an int, remove that channel from both
+                           the data and the stats. Negative indices are allowed
+                           (e.g., -1 removes the last channel).
+    """
+    def __init__(self, mean, std, rm_channel_idx=None):
+        mean = torch.tensor(mean, dtype=torch.float32).view(1, -1, 1, 1)
+        std = torch.tensor(std, dtype=torch.float32).view(1, -1, 1, 1)
+
+        # If we need to remove a channel from the stats
+        if rm_channel_idx is not None:
+            C = mean.shape[1]  
+            actual_idx = rm_channel_idx if rm_channel_idx >= 0 else C + rm_channel_idx
+            channels = list(range(C))
+            channels.remove(actual_idx)
+            mean = mean[:, channels, :, :]
+            std = std[:, channels, :, :]
+
+        self.mean = mean
+        self.std = std
+        self.rm_channel_idx = rm_channel_idx
 
     def __call__(self, sample):
-        sample["img"] = (sample["img"] - self.mean) / self.std
+        img = sample["img"]
+        sample["img"] = (img - self.mean) / self.std
         return sample
 
 class AddDOYTransform:
@@ -74,3 +101,22 @@ class AddDOYTransform:
         # Concatenate the DOY channel to the image channels along dimension 1
         img_with_doy = torch.cat([img, doy_channel], dim=1)
         return img_with_doy
+    
+class RemoveChannel:
+    def __init__(self, channel_idx=None):
+        self.channel_idx = channel_idx
+
+    def __call__(self, sample):
+        img = sample["img"]
+        T, C, H, W = img.shape
+
+        # Only remove the channel if channel_idx is actually set
+        if self.channel_idx is not None:
+            # Handle negative indexing
+            actual_idx = self.channel_idx if self.channel_idx >= 0 else C + self.channel_idx
+            channels = list(range(C))
+            channels.remove(actual_idx)
+            img = img[:, channels, :, :]
+
+        sample["img"] = img
+        return sample
