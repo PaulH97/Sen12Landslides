@@ -1,6 +1,6 @@
 _target_: src.models.lit_module.Sen12LsLitModule
 
-name: unet2d_convlstm
+name: unet2d_gru
 
 optimizer:
   _target_: torch.optim.Adam
