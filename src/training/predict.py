@@ -1,161 +1,180 @@
 import torch
-from pathlib import Path 
-import yaml
-import pytorch_lightning as pl
 import wandb
+from lightning import Trainer
+from lightning.pytorch.loggers import Logger
 import gc
-import argparse
-import random 
+import traceback
+import hydra
+from hydra.utils import instantiate
+from omegaconf import OmegaConf
+import logging
+from pathlib import Path
+from omegaconf import DictConfig
+from typing import List
 from matplotlib import pyplot as plt
 import numpy as np
+import random
 
-from benchmarking.models.modelTask import ClassificationTask
-from benchmarking.data_loading import get_dataloaders
-from benchmarking.models import get_model
-import traceback
+from src.data.data_loading import get_dataloaders
 
-def save_batch_predictions(preds, masks, imgs, output_folder, batch_idx):
+def adjust_channels(channels, variant):
+    channels = int(channels)
+    # If the variant is 'no_dem', subtract one channel (to drop the DEM band)
+    if variant == "no_dem":
+        return channels - 1
+    return channels
+
+def select_best_ckpt(ckpt_dir):
+    best_ckpt = None
+    best_val_loss = float('inf')
+    for ckpt_path in ckpt_dir.glob("*.ckpt"):
+        ckpt_name = ckpt_path.name
+        try:
+            val_loss_str = ckpt_name.split("val_loss=")[-1].split(".ckpt")[0]
+            val_loss = float(val_loss_str)
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                best_ckpt = ckpt_path
+        except (IndexError, ValueError) as e:
+            logging.warning(f"Could not parse val_loss from checkpoint name {ckpt_name}: {e}")
+    return best_ckpt
+
+def save_batch_predictions(batch, batch_idx, output_folder):
     """
-    Save one figure per sample showing three timesteps (first, middle, last) from imgs,
-    along with static prediction and mask (each with shape [B, 1, 128, 128]).
+    For each sample in the batch, create and save a figure that shows:
+      - Three images from selected timesteps (first, middle, and last),
+      - The prediction image,
+      - The ground truth mask.
+    
+    Each sample is saved as its own figure.
     
     Args:
-        preds: Tensor with shape [B, 1, 128, 128].
-        masks: Tensor with shape [B, 1, 128, 128].
-        imgs: Tensor with shape [B, 15, 11, 128, 128].
-        output_folder: Folder path where images will be saved.
-        batch_idx: Batch index used for naming files.
+        batch: Dictionary containing:
+            - "imgs": Tensor of shape [B, T, C, H, W].
+            - "preds": Tensor of shape [B, 1, H, W].
+            - "masks": Tensor of shape [B, 1, H, W].
+        output_folder: Path (string or Path) where the figures will be saved.
     """
     # Convert tensors to numpy arrays.
-    preds_np = preds.detach().cpu().numpy()   # shape: [B, 1, 128, 128]
-    masks_np = masks.detach().cpu().numpy()     # shape: [B, 1, 128, 128]
-    imgs_np  = imgs.detach().cpu().numpy()       # shape: [B, 15, 11, 128, 128]
-    
-    # Squeeze the singleton channel in preds and masks.
-    preds_np = np.squeeze(preds_np, axis=1)  # shape: [B, 128, 128]
-    masks_np = np.squeeze(masks_np, axis=1)  # shape: [B, 128, 128]
-    
-    B, T, C, H, W = imgs_np.shape  # e.g. (64, 15, 11, 128, 128)
-    # Choose three timesteps: first, middle, and last.
-    time_indices = [0, 10, 14]
-    
-    for b in range(B):
-        fig, axes = plt.subplots(3, len(time_indices), figsize=(12, 12))
-        for col, t in enumerate(time_indices):
-            # Process image from imgs[b, t] with shape (11, 128, 128).
-            img = imgs_np[b, t]
-            # If the channel count is not 1 or 3, select the first 3 channels.
-            if img.shape[0] not in [1, 3]:
-                img = img[:3]
-            # Convert from (C, H, W) to (H, W, C).
-            img = np.transpose(img, (1, 2, 0))
-            # If the result is (128, 128, 1), squeeze to (128, 128).
-            if img.ndim == 3 and img.shape[-1] == 1:
-                img = np.squeeze(img, axis=-1)
-            # Apply min-max normalization to the image.
-            img_min = img.min()
-            img_max = img.max()
-            img = (img - img_min) / (img_max - img_min)
-            
-            # For preds and masks, use the static version.
-            pred = preds_np[b]   # shape: (128, 128)
-            mask = masks_np[b]   # shape: (128, 128)
-            
-            # Plot RGB image.
-            axes[0, col].imshow(img)
-            axes[0, col].set_title(f'RGB (t={t})')
-            axes[0, col].axis('off')
-            
-            # Plot prediction.
-            axes[1, col].imshow(pred, cmap='gray')
-            axes[1, col].set_title('Prediction')
-            axes[1, col].axis('off')
-            
-            # Plot ground truth.
-            axes[2, col].imshow(mask, cmap='gray')
-            axes[2, col].set_title('Ground Truth')
-            axes[2, col].axis('off')
+    preds_np = batch["preds"].detach().cpu().numpy()   # shape: [B, H, W]
+    masks_np = batch["masks"].detach().cpu().numpy()     # shape: [B, H, W]
+    imgs_np  = batch["imgs"].detach().cpu().numpy()       # shape: [B, T, C, H, W]
         
-        plt.tight_layout()
-        out_path = Path(output_folder, f"batch{batch_idx}_sample{b}.png")
+    B, T, C, H, W = imgs_np.shape
+
+    # Choose three timesteps: if T >= 15 use [0, 10, 14], else use first, middle, last.
+    if T >= 15:
+        time_indices = [0, 10, 14]
+    else:
+        time_indices = [0, T//2, T-1]
+
+    # Helper: convert a 2D grayscale image to RGB.
+    def ensure_rgb(image):
+        if image.ndim == 2:
+            return np.stack([image, image, image], axis=-1)
+        if image.ndim == 3 and image.shape[-1] == 1:
+            return np.repeat(image, 3, axis=-1)
+        return image
+
+    # Process each sample in the batch.
+    for b in range(B):
+        n_cols = len(time_indices) + 2  # three timesteps, one prediction, one mask.
+        fig, axes = plt.subplots(1, n_cols, figsize=(4 * n_cols, 4))
+        
+        # Plot selected timesteps.
+        for i, t in enumerate(time_indices):
+            img = imgs_np[b, t]  # shape: [C, H, W]
+            C_current = img.shape[0]
+            if C_current > 3:
+                # Sentinel-2: use first 3 channels for RGB.
+                rgb_img = img[:3, :, :]
+                rgb_img = np.transpose(rgb_img, (1, 2, 0))  # shape: [H, W, 3]
+                rgb_img = (rgb_img - rgb_img.min()) / (rgb_img.max() - rgb_img.min() + 1e-8)
+                axes[i].imshow(rgb_img)
+            elif C_current <= 3:
+                # Sentinel-1: combine the first two channels (e.g. average) to form a grayscale image.
+                gray_img = np.mean(img[:2, :, :], axis=0)  # shape: [H, W]
+                gray_img = (gray_img - gray_img.min()) / (gray_img.max() - gray_img.min() + 1e-8)
+                axes[i].imshow(gray_img, cmap='gray')
+            else:
+                # If only one channel or other: convert to RGB.
+                single = np.transpose(img, (1, 2, 0))  # shape: [H, W, C]
+                single = (single - single.min()) / (single.max() - single.min() + 1e-8)
+                single = ensure_rgb(single)
+                axes[i].imshow(single)
+            axes[i].set_title(f"Time {t}")
+            axes[i].axis('off')
+        
+        # Plot prediction.
+        pred_img = preds_np[b]  # shape: [H, W]
+        pred_img = (pred_img - pred_img.min()) / (pred_img.max() - pred_img.min() + 1e-8)
+        pred_img = ensure_rgb(pred_img)
+        axes[len(time_indices)].imshow(pred_img, cmap='gray')
+        axes[len(time_indices)].set_title("Prediction")
+        axes[len(time_indices)].axis('off')
+        
+        # Plot ground truth mask.
+        mask_img = masks_np[b]  # shape: [H, W]
+        mask_img = (mask_img - mask_img.min()) / (mask_img.max() - mask_img.min() + 1e-8)
+        mask_img = ensure_rgb(mask_img)
+        axes[len(time_indices) + 1].imshow(mask_img, cmap='gray')
+        axes[len(time_indices) + 1].set_title("Mask")
+        axes[len(time_indices) + 1].axis('off')
+        
+        out_path = Path(output_folder) / "images" / f"batch{batch_idx}_sample_{b}.png"
+        out_path.parent.mkdir(exist_ok=True, parents=True)
+
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
         plt.savefig(out_path)
         plt.close(fig)
+        logging.info(f"Saved sample {b} to {out_path}")
 
-def predict(model_config, iteration_idx):
+OmegaConf.register_new_resolver("adjust_channels", adjust_channels)
+
+@hydra.main(config_path="../../configs", config_name="config.yaml", version_base="1.3.2")
+def main(cfg):
+    logging.info(OmegaConf.to_yaml(cfg))
     try:
-        model_config = Path(model_config)
-        with open(model_config, 'r') as file:
-            config = yaml.safe_load(file)
-        model_name = model_config.stem
+        train_loader, val_loader, test_loader = get_dataloaders(cfg)
+        logging.info(f"Train dataset size: {len(train_loader.dataset)}, Val dataset size: {len(val_loader.dataset)}, Test dataset size: {len(test_loader.dataset)}")
+     
+        callback = instantiate(cfg.callback)
+        ckpt_dir = Path(callback.dirpath)
+        ckpt_path = select_best_ckpt(ckpt_dir)
 
-        # Prepare data paths and directories
-        base_dir = Path(config["DATA"]["base_dir"])
-        exp_data_dir = Path(config["DATA"]["exp_data_dir"])
-        satellite = config["DATA"]["satellite"]
-        data_dir = exp_data_dir / satellite / f"i{iteration_idx}"
-        data_paths_file = data_dir / "data_paths.json"
-        norm_file = data_dir / "norm_data.json"
+        trainer= Trainer(
+            accelerator="gpu" if torch.cuda.is_available() else "cpu",
+            devices=1,
+            default_root_dir=cfg.log_dir,
+            callbacks=[callback]
+        )
+
+        model = instantiate(cfg.model)
+        predictions = trainer.predict(model=model, dataloaders=test_loader, ckpt_path=ckpt_path)
+
+        preds_dir = Path(cfg.output_dir) / "predictions"
+        preds_dir.mkdir(exist_ok=True, parents=True)
         
-        model_dir = data_dir / model_name 
-        train_dir = model_dir / "training"
-        test_dir = model_dir / "test"
-
-        if not train_dir.exists() or not test_dir.exists():
-            raise FileNotFoundError(f"{train_dir} or {test_dir} does not exist. Make sure they are created during the pretraining setup.")
-
-        # Get dataloaders
-        train_dl, val_dl, test_dl = get_dataloaders(config, base_dir, data_paths_file, norm_file)
-
-        print("Length of train_dl: ", len(train_dl))
-        print("Length of val_dl: ", len(val_dl))
-        print("Length of test_dl: ", len(test_dl))
-
-        ckpt_path = train_dir / "checkpoints" / f"{model_name}-best.ckpt"
-                    
-        model = get_model(config)
-        model = ClassificationTask.load_from_checkpoint(model=model, checkpoint_path=ckpt_path, config=config)
-
-        trainer = pl.Trainer(accelerator="gpu" if torch.cuda.is_available() else "cpu", devices=1)
-
-        # Save predictions (only on rank 0)
-        if trainer.is_global_zero:
-            predictions = trainer.predict(model, test_dl)
-            predict_dir = Path(test_dir, "predictions")
-            predict_dir.mkdir(parents=True, exist_ok=True)
-
-            # Select specific batches to save
-            specific_batches = random.sample(range(len(predictions)), 2)  
-            for batch_idx in specific_batches:
-                if batch_idx < len(predictions):
-                    batch = predictions[batch_idx]
-                    preds = batch["preds"]
-                    masks = batch["masks"]
-                    imgs = batch["images"]
-
-                    # Ensure tensors are on CPU
-                    preds = preds.cpu()
-                    masks = masks.cpu()
-                    imgs = imgs.cpu()
-                    
-                    save_batch_predictions(preds, masks, imgs, predict_dir, batch_idx)
-                else:
-                    print(f"Batch index {batch_idx} is out of range.")
+        random_batches = random.sample(predictions, 2) 
+        for idx, batch in enumerate(random_batches):
+            save_batch_predictions(batch, idx, preds_dir)
+        
+        preds = torch.cat([batch["preds"] for batch in predictions], dim=0)
+        masks = torch.cat([batch["masks"] for batch in predictions], dim=0)
+        pred_file = preds_dir / f"predictions.pt"
+        torch.save({"preds": preds, "masks": masks}, pred_file)
+        
+        logging.info(f"Predictions saved to {pred_file}")
 
     except Exception as e:
-        print(f"Training crashed on iteration {data_dir.stem} with error: {e}")
         traceback.print_exc()
+        print(f"Training crashed on iteration with error: {e}")
     finally:
         wandb.finish()
-        torch.cuda.empty_cache()  # Clear GPU memory after each iteration
+        torch.cuda.empty_cache()
         gc.collect()
 
 if __name__ == "__main__":
-    # Parse command-line arguments
-    parser = argparse.ArgumentParser(description="Train a model with specific iteration index.")
-    parser.add_argument("-c", "--model_config", required=True, help="Model config file")
-    parser.add_argument("-i", "--iteration", type=int, required=True, help="Iteration index")
-    args = parser.parse_args()
-    predict(args.model_config, args.iteration)
+    main()
 
-# salloc --account=hpda-c --nodes=1 --ntasks-per-node=1 --gres=gpu:1 --partition=hpda2_compute_gpu --time=02:00:00
-# salloc --account=hpda-c --nodes=1 --ntasks-per-node=4 --gres=gpu:4 --cpus-per-task=2 --partition=hpda2_testgpu --time=01:00:00
+# python /dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/src/training/test.py --multirun dataset=s2,s1asc,s1dsc

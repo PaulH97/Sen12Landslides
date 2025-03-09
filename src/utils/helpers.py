@@ -1,104 +1,113 @@
-import random
+import random 
 import shutil
-from matplotlib import pyplot as plt
+from pathlib import Path
 import numpy as np
+import matplotlib.pyplot as plt
 
-def run_sanity_check(train_dl, satellite,  output_dir):
+def run_sanity_check(data_loader, output_dir, num_samples=10):
+    """
+    Runs a simple sanity check by randomly sampling 'num_samples' patches
+    from the 'train_dl' DataLoader and visualizing them.
 
-    def s1_sanity_check(sample, sample_idx, output_dir):
+    Logic:
+      - If the sample has 2 channels, we assume it's S1 (VV & VH).
+      - If it has more than 2 channels, we assume it's S2 and plot the first 3 as RGB.
+    
+    Args:
+        train_dl: PyTorch DataLoader whose dataset returns dicts with {'img': tensor, 'msk': tensor}
+        output_dir: Directory to save the generated sanity-check images
+        num_samples: Number of random samples to visualize
+    """
 
-        output_file = output_dir / f"sample_{sample_idx}"
-
-        img = sample['img'].numpy()  # Convert the image to NumPy
-        msk = sample['msk'].numpy()  # Convert the mask to NumPy
-
-
-        # Plot each time step
-        timesteps = img.shape[0]
-        fig, axs = plt.subplots(2, timesteps + 1, figsize=(3 * (timesteps + 1), 8), sharey=True)
-
-        # Plot each time step for the image data
-        for i in range(timesteps):
-            vh = img[i, 0, :, :]
-            vv = img[i, 1, :, :]  
-
-            # Normalize for visualization with safe division
-            vh_range = vh.max() - vh.min()
-            vv_range = vv.max() - vv.min()
-
-            vh_norm = (vh - vh.min()) / vh_range if vh_range != 0 else np.zeros_like(vh)
-            vv_norm = (vv - vv.min()) / vv_range if vv_range != 0 else np.zeros_like(vv)
-
-            # Plot VV polarization for the given timestep
-            axs[0, i].imshow(vv_norm, cmap='gray')
-            axs[0, i].axis('off')
-            axs[0, i].set_title(f'Time {i} VV', fontsize=8)
-
-            # Plot VH polarization for the given timestep
-            axs[1, i].imshow(vh_norm, cmap='gray')
-            axs[1, i].axis('off')
-            axs[1, i].set_title(f'Time {i} VH', fontsize=8)
-
-        # Plot the mask in the last column
-        mask_img = msk.squeeze()
-        axs[0, -1].imshow(mask_img, cmap='gray')
-        axs[0, -1].set_title("Mask", fontsize=8)
-        axs[0, -1].axis('off')
-        axs[1, -1].imshow(mask_img, cmap='gray')
-        axs[1, -1].axis('off')
-
-        plt.tight_layout()
-        plt.savefig(output_file)
-        plt.show()
-        plt.close()
-
-        print(f"Saved S1 sanity check to: {output_file}")
-
-    def s2_sanity_check(sample, sample_idx, output_dir):
-
-        output_file = output_dir / f"sample_{sample_idx}"
-
-        img = sample['img'].numpy()  # Convert the image to NumPy
-        msk = sample['msk'].numpy()  # Convert the mask to NumPy
-
-        # Plot each time step
-        timesteps = img.shape[0]
-        fig, axs = plt.subplots(1, timesteps + 1, figsize=(3 * (timesteps + 1), 6), sharey=True)
-
-        # Plot each time step for the image data
-        for i in range(timesteps):
-            rgb_img = np.stack([img[i, 2, :, :], img[i, 1, :, :], img[i, 0, :, :]], axis=-1)  # Assuming B02, B03, B04 order
-            rgb_img_min, rgb_img_max = rgb_img.min(), rgb_img.max()
-            rgb_img_norm = (rgb_img - rgb_img_min) / (rgb_img_max - rgb_img_min)
-
-            # Plot RGB image
-            axs[i].imshow(rgb_img_norm)
-            axs[i].axis('off')
-            axs[i].set_title(f'Time {i}', fontsize=8)
-
-        # Plot the mask in the last column
-        mask_img = msk.squeeze()
-        axs[-1].imshow(mask_img, cmap='gray')
-        axs[-1].axis('off')
-        axs[-1].set_title("Mask", fontsize=8) 
-
-        plt.tight_layout()
-        plt.savefig(output_file)
-        plt.show()
-
-        print(f"Saved S2 sanity check to: {output_file}")
-
+    # Remove old sanity-check folder if it exists
     if output_dir.exists():
         shutil.rmtree(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    random_indices = random.sample(range(len(train_dl.dataset)), 10)
-    
-    for random_idx in random_indices:
-        random_sample = train_dl.dataset[random_idx]  # Get the random sample from the dataset
-        if satellite in ["S2", "S2_noDEM"]:
-            s2_sanity_check(random_sample, random_idx, output_dir)
-        elif satellite in ["S1-asc", "S1-dsc", "S1-asc_noDEM", "S1-dsc_noDEM"]:
-            s1_sanity_check(random_sample, random_idx, output_dir)
+    # Pick random indices from the dataset
+    random_indices = random.sample(range(len(data_loader.dataset)), num_samples)
+
+    for sample_idx in random_indices:
+        sample = data_loader.dataset[sample_idx]
+        img = sample['img'].numpy()  # [T, C, H, W]
+        msk = sample['msk'].numpy()  # [H, W] or [1, H, W]
+
+        # Flatten mask if needed
+        mask_img = msk.squeeze()
+
+        T, C, H, W = img.shape
+        output_file = output_dir / f"sample_{sample_idx}.png"
+
+        if C <= 3:
+            # ------------------------
+            # Sentinel-1 style VV & VH (+ DEM)
+            # ------------------------
+            fig, axs = plt.subplots(
+                2, T + 1,
+                figsize=(3 * (T + 1), 8),
+                sharey=True
+            )
+
+            for t in range(T):
+                vv = img[t, 0, :, :]
+                vh = img[t, 1, :, :]
+
+                def normalize(arr):
+                    rng = arr.max() - arr.min()
+                    return (arr - arr.min()) / rng if rng != 0 else np.zeros_like(arr)
+
+                vv_norm = normalize(vv)
+                vh_norm = normalize(vh)
+
+                axs[0, t].imshow(vv_norm, cmap='gray')
+                axs[0, t].axis('off')
+                axs[0, t].set_title(f"Time {t} VV", fontsize=8)
+
+                axs[1, t].imshow(vh_norm, cmap='gray')
+                axs[1, t].axis('off')
+                axs[1, t].set_title(f"Time {t} VH", fontsize=8)
+
+            # Mask in the last column
+            axs[0, -1].imshow(mask_img, cmap='gray')
+            axs[0, -1].axis('off')
+            axs[0, -1].set_title("Mask", fontsize=8)
+            axs[1, -1].imshow(mask_img, cmap='gray')
+            axs[1, -1].axis('off')
+
         else:
-            raise ValueError(f"Satellite {satellite} not recognized")
+            # ------------------------
+            # Sentinel-2 style (RGB)
+            # ------------------------
+            fig, axs = plt.subplots(
+                1, T + 1,
+                figsize=(3 * (T + 1), 6),
+                sharey=True
+            )
+
+            for t in range(T):
+                # Use first 3 channels as RGB
+                # Adjust if your data uses a different ordering!
+                red   = img[t, 2, :, :] if C >= 3 else img[t, 0, :, :]
+                green = img[t, 1, :, :] if C >= 2 else img[t, 0, :, :]
+                blue  = img[t, 0, :, :]
+
+                rgb = np.stack([red, green, blue], axis=-1)
+                rgb_min, rgb_max = rgb.min(), rgb.max()
+                if rgb_max - rgb_min != 0:
+                    rgb_norm = (rgb - rgb_min) / (rgb_max - rgb_min)
+                else:
+                    rgb_norm = np.zeros_like(rgb)
+
+                axs[t].imshow(rgb_norm)
+                axs[t].axis('off')
+                axs[t].set_title(f"Time {t}", fontsize=8)
+
+            # Mask in the last column
+            axs[-1].imshow(mask_img, cmap='gray')
+            axs[-1].axis('off')
+            axs[-1].set_title("Mask", fontsize=8)
+
+        plt.tight_layout()
+        plt.savefig(output_file, dpi=150)
+        plt.close()
+        print(f"Saved sanity check to: {output_file}")
