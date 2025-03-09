@@ -1,0 +1,22 @@
+name: utae
+model:
+  _target_: src.models.UTAE.utae.UTAE
+  timeseries_len: ${dataset.patch_length}
+  num_channels: ${dataset.patch_channels}
+  shape_pattern: NCTHW 
+  num_classes: 1
+  batch_size: 4
+  encoder_widths: [64, 64, 64, 128]
+  decoder_widths: [32, 32, 64, 128]
+  str_conv_k: 4
+  str_conv_s: 2
+  str_conv_p: 1
+  agg_mode: att_group
+  encoder_norm: group
+  n_head: 16
+  d_model: 256
+  d_k: 4
+  encoder: False
+  return_maps: False
+  pad_value: 0
+  padding_mode: reflect

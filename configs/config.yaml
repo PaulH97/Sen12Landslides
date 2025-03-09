@@ -1,0 +1,35 @@
+defaults:
+  - _self_
+  - experiment: exp1
+  - model: unet3d
+  - dataset: s2
+  - callback: model_checkpoint 
+  - logger: wandb 
+
+experiment:
+  variant: "final"
+
+base_dir: "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides"
+exp_dir: ${base_dir}/experiments/${experiment.name}/${experiment.variant}/${dataset.name}
+log_dir: ${base_dir}/outputs/logs
+output_dir: ${base_dir}/outputs/${experiment.name}/${experiment.variant}/${dataset.name}/${model.name}
+
+trainer: 
+  accelerator: gpu
+  strategy: ddp
+  devices: 1
+  precision: 16-mixed
+  max_epochs: 50
+  default_root_dir: ${log_dir}
+
+dataset:
+  batch_size: 32
+
+sanity_check: false
+
+hydra:
+  run:
+    dir: ${output_dir}
+  sweep:
+    dir: ${base_dir}/outputs
+    subdir: ${experiment.name}/${experiment.variant}/${dataset.name}/${model.name}

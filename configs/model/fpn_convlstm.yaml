@@ -1,0 +1,25 @@
+_target_: src.models.mnist_module.MNISTLitModule
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 5
+
+model:
+  _target_: src.models.BiConvRNN.fpn.FPNConvLSTM
+  input_dim
+  num_classes
+  inconv=[32, 64]
+  n_levels=5
+  n_channels=64
+  hidden_size=88
+  input_shape=(128, 128)
+  mid_conv=True
+  pad_value=0

@@ -1,0 +1,7 @@
+name: s1dsc
+full_name: sentinel-1-dsc
+list_of_bands: ["VH", "VV", "DEM"]
+patch_size: 128
+patch_length: 15
+patch_channels: 3
+nodata_value: -9999.0

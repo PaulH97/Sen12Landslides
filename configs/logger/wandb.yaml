@@ -1,0 +1,12 @@
+_target_: lightning.pytorch.loggers.wandb.WandbLogger                  
+project: "Sen12Landslides"
+name: "${model.name}_${dataset.name}_${experiment.name}_${experiment.variant}"
+save_dir: ${log_dir}/wandb
+offline: False
+id: null                            
+anonymous: null                     
+log_model: False                    
+prefix: ""                          
+group: ""
+tags: ["${model.name}", "${dataset.name}", "${experiment.name}", "${experiment.variant}"]
+job_type: null

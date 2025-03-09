@@ -1,0 +1,22 @@
+_target_: src.models.mnist_module.MNISTLitModule
+
+optimizer:
+  _target_: torch.optim.Adam
+  _partial_: true
+  lr: 0.001
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  _partial_: true
+  mode: min
+  factor: 0.1
+  patience: 5
+
+net:
+  _target_: src.models.BiConvRNN.convlstm.BConvLSTM_Seg
+  num_classes: 2
+  input_size: ${dataset.patch_size}
+  input_dim: ${dataset.patch_channels}     
+  hidden_dim: 64      
+  kernel_size: 3
+  pad_value: 0
