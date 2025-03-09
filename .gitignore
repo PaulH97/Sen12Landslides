@@ -1,5 +1,6 @@
 # Ignore all files in the data folder
 data/
+!src/data/
 src/scripts/
 
 # Ignore common large files and cache files
@@ -34,4 +35,5 @@ Thumbs.db
 # Output directories
 outputs/
 results/
+multirun/
 
