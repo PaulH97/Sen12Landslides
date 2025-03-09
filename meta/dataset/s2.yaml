@@ -1,8 +1,0 @@
-name: s2
-full_name: sentinel-2
-list_of_bands: ["B02", "B03", "B04", "B05", "B06", "B07", "B08", "B8A", "B11", "B12", "DEM"]
-patch_size: 128
-input_length: 15
-input_channels: 11  
-nodata_value: -9999.0
-

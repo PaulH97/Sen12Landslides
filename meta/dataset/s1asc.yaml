@@ -1,7 +1,0 @@
-name: s1asc
-full_name: sentinel-1asc
-list_of_bands: ["VH", "VV", "DEM"]
-patch_size: 128
-patch_length: 15
-input_channels: 3
-nodata_value: -9999.0
