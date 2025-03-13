@@ -1,7 +1,6 @@
 import torch
 import wandb
-from lightning import Callback, Trainer
-from lightning.pytorch.loggers import Logger
+from lightning import Trainer
 import gc
 import traceback
 import hydra
@@ -9,8 +8,6 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 import logging
 from pathlib import Path
-from omegaconf import DictConfig
-from typing import List
 
 from src.data.data_loading import get_dataloaders
 from src.utils.helpers import run_sanity_check
@@ -41,12 +38,18 @@ def main(cfg):
         logger = instantiate(cfg.logger)
         callback = instantiate(cfg.callback)
 
+        cfg_to_log = {
+            "dataset": cfg.dataset.name,
+            "model": cfg.model.name,
+            "exp": cfg.experiment.name,
+            "exp_variant": cfg.experiment.variant,
+            "seed": cfg.seed,
+        }
+        logger.experiment.config.update(cfg_to_log)
+
         trainer= Trainer(
             logger=logger,
-            callbacks=callback,
-            limit_train_batches=5,
-            limit_val_batches=5,
-            limit_test_batches=5,
+            callbacks=[callback],
             **cfg.trainer
         )
 

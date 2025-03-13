@@ -14,7 +14,7 @@ def load_predictions(pred_file: Path):
     Load 'preds' and 'masks' from a .pt file. 
     Each is typically [N, H, W] (class indices) or [N, ...] with some shape.
     """
-    data = torch.load(pred_file)
+    data = torch.load(pred_file, weights_only=True)
     return data["preds"], data["masks"]
 
 def majority_vote_merge(*pred_tensors: torch.Tensor) -> torch.Tensor:
@@ -63,7 +63,7 @@ def main(exp_dir):
                     models_with_preds[model_name][data_dir.name] = pred_file
 
     model_metrics = {}
-    
+
     for model, preds_files in models_with_preds.items():
 
         s1asc_preds, _ = load_predictions(preds_files["s1asc"])
@@ -74,9 +74,10 @@ def main(exp_dir):
         s12_merged = majority_vote_merge(s1_merged, s2_preds)
 
         s1_metrics = compute_metrics(s1_merged, s2_masks, num_classes=2)
+        s2_metrics = compute_metrics(s2_preds, s2_masks, num_classes=2)
         s12_metrics = compute_metrics(s12_merged, s2_masks, num_classes=2)
 
-        model_metrics[model] = {"S1": s1_metrics, "S12": s12_metrics}
+        model_metrics[model] = {"S1": s1_metrics, "S2": s2_metrics, "S12": s12_metrics}
 
     # Write out final JSON
     out_path = root_dir / "metrics.json"
