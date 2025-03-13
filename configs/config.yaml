@@ -16,18 +16,38 @@ output_dir: ${base_dir}/outputs/${experiment.name}/${experiment.variant}/${datas
 
 # only for training 
 trainer: 
-  accelerator: cpu
+  accelerator: gpu
   strategy: ddp
   devices: 1
   precision: 16-mixed
   max_epochs: 50
-  fast_dev_run: true
+  fast_dev_run: false
   default_root_dir: ${log_dir}
 
 dataset:
-  batch_size: 1
-
+  batch_size: 32
+  
 sanity_check: false
+
+seed: 42
+
+split_settings:
+  output_dir: ${base_dir}/S12LS_AD
+  filter_criteria:
+    exclude_patterns: []
+    include_patterns: []
+    satellites: ["s1asc", "s1dsc", "s2"]
+    reference_sat: "s2"
+    unify_test: true
+    min_confidence: null
+    max_confidence: null
+    annotated_only: false
+    non_annotated_only: false
+    annotated_ratio: 0.7
+  n_workers: 20
+  test_size: 0.2
+  val_size: 0.2
+  seed: 42
 
 hydra:
   run:
@@ -35,3 +55,4 @@ hydra:
   sweep:
     dir: ${base_dir}/outputs
     subdir: ${experiment.name}/${experiment.variant}/${dataset.name}/${model.name}
+
