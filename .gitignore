@@ -2,6 +2,7 @@
 data/
 !src/data/
 src/scripts/
+src/models/stamnet.py 
 
 # Ignore common large files and cache files
 *.log
@@ -14,7 +15,9 @@ src/scripts/
 *.zip
 *.gz
 *.7z
-
+*.sh
+*.err
+*.out
 
 # Ignore Python cache & virtual environments
 __pycache__/
