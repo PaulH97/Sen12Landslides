@@ -1,6 +1,6 @@
 _target_: src.models.lit_module.Sen12LsLitModule
 
-name: unet2d_convlstm
+name: unet_gru
 
 optimizer:
   _target_: torch.optim.Adam
@@ -20,13 +20,13 @@ net:
   num_channels: ${adjust_channels:${dataset.patch_channels}, ${experiment.variant}}
   timeseries_len: ${dataset.patch_length} 
   img_res: ${dataset.patch_size} 
-  train_stage: 2                         # Training stage (0, 2, 3, or 4)                    
+  train_stage: 2                          # Training stage (0, 2, 3, or 4)                    
   attn_channels: 128                      # Number of attention channels
   cscl_win_size: 3                        # Attention window size
   cscl_win_dilation: 1                    # Dilation for CSCL attention
   cscl_win_stride: 1                      # Stride for CSCL attention
   attn_groups: 1                      
-  crnn_model_name: "clstm"                # Type of recurrent model ("gru" or "clstm")
+  crnn_model_name: "gru"                # Type of recurrent model ("gru" or "clstm")
   bidirectional: false                    # Whether to use bidirectional CRNN
   avg_hidden_states: true                 # Whether to average hidden states in CRNN
   pretrained: false                       # Whether to use a pretrained backbone
