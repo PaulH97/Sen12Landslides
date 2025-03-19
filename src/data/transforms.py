@@ -11,26 +11,6 @@ class Compose:
             sample = t(sample)
         return sample
 
-class NoDataReplace:
-    def __init__(self, global_means, nodata_value=-9999.0):
-        if not isinstance(global_means, torch.Tensor):
-            self.global_means = torch.tensor(global_means, dtype=torch.float32)
-        else:
-            self.global_means = global_means
-        self.nodata_value = nodata_value
-
-    def __call__(self, sample):
-        img = sample["img"]  # expected shape: (T, C, H, W)
-        replacement = self.global_means.view(-1, 1, 1).to(img.dtype)
-        expanded_replacement = replacement.unsqueeze(0)  # now shape (1, C, 1, 1)
-
-        # Create a mask where either nodata value or nan is found.
-        mask = (img == self.nodata_value) | torch.isnan(img)
-        img = torch.where(mask, expanded_replacement, img)
-
-        sample["img"] = img
-        return sample
-
 class RandomFlip:
     def __init__(self, horizontal_flip_prob=0.5, vertical_flip_prob=0.5):
         self.horizontal_flip_prob = horizontal_flip_prob
@@ -119,4 +99,31 @@ class RemoveChannel:
             img = img[:, channels, :, :]
 
         sample["img"] = img
+        return sample
+
+class FiveCrop:
+    def __init__(self, size):
+        self.size = (size, size) if isinstance(size, int) else size
+
+    def five_crops(self, tensor, crop_h, crop_w):
+        # tensor shape: [T, C, H, W]
+        T, C, H, W = tensor.shape
+        crops = [
+            tensor[:, :, :crop_h, :crop_w],        # top-left
+            tensor[:, :, :crop_h, -crop_w:],        # top-right
+            tensor[:, :, -crop_h:, :crop_w],        # bottom-left
+            tensor[:, :, -crop_h:, -crop_w:],        # bottom-right
+            tensor[:, :, (H - crop_h) // 2:(H - crop_h) // 2 + crop_h,
+                         (W - crop_w) // 2:(W - crop_w) // 2 + crop_w]  # center
+        ]
+        return torch.cat(crops, dim=0)
+
+    def __call__(self, sample):
+        crop_h, crop_w = self.size
+        for key in ["img", "mask"]:
+            if key in sample:
+                tensor = sample[key]
+                if crop_h > tensor.shape[-2] or crop_w > tensor.shape[-1]:
+                    raise ValueError(f"Crop size must be smaller than the {key} size")
+                sample[key] = self.five_crops(tensor, crop_h, crop_w).view(-1, tensor.shape[1], crop_h, crop_w)
         return sample
