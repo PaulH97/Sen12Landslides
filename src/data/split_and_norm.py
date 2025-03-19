@@ -34,11 +34,7 @@ class NetCDFDataset(Dataset):
             for var in ds.data_vars:
                 if var not in self.exclude_vars:
                     arr = ds[var].values  # shape could be (H, W) or (T, H, W), etc.
-                    if var == "dem":
-                        arr[arr == -999.0] = np.nan
-                    else:
-                        arr[arr == -9999.0] = np.nan
-                        data_arrays.append(arr)
+                    data_arrays.append(arr)
 
         # Stack along a new band dimension => shape (C, H, W) or (C, T, H, W)
         data = np.stack(data_arrays, axis=0)
@@ -48,6 +44,23 @@ def collate_fn(batch):
     batch = list(map(torch.Tensor, batch))
     batch = torch.concat(batch, dim=0)
     return batch
+
+def file_key(file_path):
+    """
+    Extract a common key from a file path to identify the same geographical location
+    across different satellite data types.
+    
+    Args:
+        file_path: Path object representing the file path
+        
+    Returns:
+        A string key that identifies the geographical location
+    """
+    # Extract the base filename without extension
+    base_name = file_path.stem
+    # Remove the satellite identifier (e.g., '_s1asc', '_s1dsc', '_s2') from the base name
+    key = re.sub(r'_(s1asc|s1dsc|s2)', '', base_name)
+    return key
 
 def compute_mean_std(files, n_workers=4):
     """
@@ -69,7 +82,6 @@ def compute_mean_std(files, n_workers=4):
     # Peek at first sample => shape: (C, T*H*W) or (C, H, W) ...
     first_sample = dataset[0]
     n_bands = first_sample.shape[0]
-    logging.info(f"Found {len(files)} files, shape={first_sample.shape}, bands={n_bands}")
 
     # --- Pass 1: sum + count of non-NaN => mean
     sum_data = torch.zeros([n_bands], dtype=torch.float64)
@@ -174,11 +186,73 @@ def stratified_split(patch_array, coverage_array, test_size=0.2, seed=42):
     test_files = patch_array[test_idx]
     return train_files, test_files
 
-def file_key(p: Path):
-    filename = p.stem.lower()
-    for pattern in [r"_s1-asc", r"_s1asc", r"_s1-dsc", r"_s1dsc", r"_s1", r"_s2"]:
-        filename = re.sub(pattern, "", filename)
-    return filename
+def unify_common_test_across_all(final_splits):
+    """
+    Given a dictionary like:
+      {
+        "original_s2": {"train": [...], "val": [...], "test": [...]},
+        "original_s1asc": {...},
+        ...
+        "refined_s1dsc": {...}
+      }
+
+    1) Convert each 'test' list to a dictionary: { file_key(...) -> original_path }
+    2) Compute the intersection of keys across all combos.
+    3) For each dataset key, remove any test items not in the intersection, add them back to 'train'.
+    4) Return the updated final_splits.
+
+    After this, all combos have the same test *keys*, ensuring a unified test set.
+    """
+
+    # 1) Convert 'test' list to a dict: key -> original path
+    test_dicts = {}
+    for combo_key, splits_dict in final_splits.items():
+        test_list = splits_dict.get("test", [])
+        # Build a dict { file_key: original_path }
+        d = {}
+        for path_str in test_list:
+            p = Path(path_str)
+            k = file_key(p)
+            d[k] = path_str  # store original path string
+        test_dicts[combo_key] = d
+
+    # 2) Compute the intersection of keys across all combos
+    all_keys = list(test_dicts.keys())
+    if not all_keys:
+        # no combos, just return
+        return final_splits
+
+    # Start with the first combo's set of keys
+    combo_iter = iter(all_keys)
+    first_combo = next(combo_iter)
+    common_keys = set(test_dicts[first_combo].keys())
+
+    for combo_key in combo_iter:
+        common_keys &= set(test_dicts[combo_key].keys())
+
+    # 3) For each dataset, remove any test items not in the intersection, move them to 'train'
+    for combo_key, splits_dict in final_splits.items():
+        # old test dict => {k -> original_path}
+        old_test_dict = test_dicts[combo_key]
+        # new_test_keys => intersection
+        new_test_keys = set(old_test_dict.keys()) & common_keys
+        # leftover_keys => old_test_keys - new_test_keys
+        leftover_keys = set(old_test_dict.keys()) - new_test_keys
+
+        # Build new test list from the intersection
+        new_test_list = [old_test_dict[k] for k in new_test_keys]
+
+        # Move leftover items back to train
+        # First convert train list to a set for dedup
+        train_set = set(splits_dict.get("train", []))
+        for k in leftover_keys:
+            train_set.add(old_test_dict[k])
+
+        # Overwrite final splits
+        final_splits[combo_key]["train"] = list(train_set)
+        final_splits[combo_key]["test"] = new_test_list
+
+    return final_splits
 
 def to_rel(base_dir, paths):
     return [str(p.relative_to(base_dir)) for p in paths]
@@ -214,7 +288,7 @@ def build_reference_test_split_exp1(files, test_size=0.2, seed=42):
 
     return test_keys
 
-def build_reference_test_split_exp2(files, test_size=0.2, seed=42):
+def build_reference_test_split(files, test_size=0.2, seed=42):
 
     # 1) coverage classes for all
     n_workers = int(os.getenv('SLURM_CPUS_PER_TASK', 20))
@@ -222,20 +296,19 @@ def build_reference_test_split_exp2(files, test_size=0.2, seed=42):
 
     train_files, test_files = stratified_split(patch_array, coverage_array, test_size=test_size, seed=seed)
     
-    logging.info(f"[Exp3] Train count= {len(train_files)} Test count = {len(test_files)}")
+    logging.info(f"[Exp] Train count= {len(train_files)} Test count = {len(test_files)}")
 
     test_keys  = {file_key(f) for f in test_files}
 
     return test_keys
 
-def build_splits_from_test_keys(cfg, dataset_type, satellite, test_keys, val_size=0.2, seed=42):
+def build_splits_from_test_keys(base_dir, dataset_type, satellite, test_keys, val_size=0.2, seed=42):
     """
     1) Gather patches in data/<variant>/<satellite>
     2) If a patch's key is in test_keys => test
     3) leftover => coverage-based => train vs val
     4) Return {"train": [...], "val": [...], "test": [...]}
     """    
-    base_dir = Path(cfg.base_dir)
     data_dir = base_dir / "data" / dataset_type / satellite
     all_files = sorted(data_dir.glob("*.nc"))
 
@@ -338,7 +411,7 @@ def unify_common_test_across_all(final_splits):
 
     return final_splits
 
-def build_splits_exp1(cfg, test_size=0.2, val_size=0.2, seed=42):
+def build_splits_exp1(base_dir, exp_dir, test_size=0.2, val_size=0.2, seed=42):
     """
     1) Build reference test keys from refined/s2
     2) For each (variant, satellite) in {("original", "s2"), ("original", "s1asc"), ...,
@@ -346,15 +419,12 @@ def build_splits_exp1(cfg, test_size=0.2, val_size=0.2, seed=42):
        -> build_splits_from_test_keys
     3) Return a big dictionary or write them to JSON as needed
     """
-    base_dir = Path(cfg.base_dir)
-    ref_satellite = cfg.experiment.preprocess.ref_satellite
-    ref_dataset_type = cfg.experiment.preprocess.ref_dataset_type
-    ref_patch_data_dir = base_dir / "data" / ref_dataset_type / ref_satellite
+    ref_patch_data_dir = base_dir / "data" / "final" / "s2"	
     ref_files = sorted(ref_patch_data_dir.glob("*.nc"))
     
     # 1) Reference test keys from refined/s2
-    logging.info(f"[Exp1] Using satellite={ref_satellite} as reference with N={len(ref_files)}")
-    test_keys = build_reference_test_split_exp1(ref_files, test_size, seed)
+    logging.info(f"[Exp1] Using satellite=s2_final as reference with N={len(ref_files)}")
+    test_keys = build_reference_test_split(ref_files, test_size, seed)
 
     # 2) Build splits for each variant, satellite
     combos = [
@@ -368,7 +438,7 @@ def build_splits_exp1(cfg, test_size=0.2, val_size=0.2, seed=42):
     
     final_splits = {}
     for (v, sat) in combos:
-        splits = build_splits_from_test_keys(cfg, v, sat, test_keys, val_size, seed)
+        splits = build_splits_from_test_keys(base_dir, v, sat, test_keys, val_size, seed)
         final_splits[f"{v}_{sat}"] = splits
     
     # 3) Unify common test across all
@@ -378,7 +448,7 @@ def build_splits_exp1(cfg, test_size=0.2, val_size=0.2, seed=42):
         dataset_type, satellite = combo_key.split("_")
         logging.info(f"[Exp1] {satellite.upper()}-{dataset_type}: Train={len(splits_dict['train'])} Val={len(splits_dict['val'])} Test={len(splits_dict['test'])}")
         
-        output_dir = Path(cfg.experiment.dir) / dataset_type / satellite
+        output_dir = Path(exp_dir) / dataset_type / satellite
         output_dir.mkdir(parents=True, exist_ok=True)
 
         data_paths_file = output_dir / "data_paths.json"
@@ -391,24 +461,22 @@ def build_splits_exp1(cfg, test_size=0.2, val_size=0.2, seed=42):
 
         # 4) Compute mean/std for each split
         mean, std = compute_mean_std(splits_dict["train"], n_workers=20)
-        logging.info(f"[Exp1] Mean={mean} Std={std}")
+        logging.info(f"[Exp1] Mean={mean}")
+        logging.info(f"[Exp1] Std={std}")
         
         mean_std_file = output_dir / "norm_data.json"
         with open(mean_std_file, "w") as f:
             f.write(json.dumps({"mean": mean.tolist(), "std": std.tolist()}, indent=2))
         logging.info(f"[Exp1] Mean/Std saved to {mean_std_file}")
-            
-def build_splits_exp2(cfg, test_size=0.2, val_size=0.2, seed=42):
 
-    base_dir = Path(cfg.base_dir)
-    ref_satellite = cfg.experiment.preprocess.ref_satellite
-    ref_dataset_type = cfg.experiment.preprocess.ref_dataset_type
-    ref_data_dir = base_dir / "data" / ref_dataset_type / ref_satellite 
+def build_splits_exp2(base_dir, exp_dir, test_size=0.2, val_size=0.2, seed=42):
+
+    ref_data_dir = base_dir / "data" / "final" / "s2"	
     ref_files = sorted(ref_data_dir.glob("*.nc"))
     
     # 1) Reference test keys from refined/s2
-    logging.info(f"[Exp2] Using satellite={ref_satellite} as reference with N={len(ref_files)}")
-    test_keys = build_reference_test_split_exp2(ref_files, test_size, seed)
+    logging.info(f"[Exp2] Using satellite=s2_final as reference with N={len(ref_files)}")
+    test_keys = build_reference_test_split(ref_files, test_size, seed)
 
     # 2) Build splits for each variant, satellite 
     combos = [
@@ -419,7 +487,7 @@ def build_splits_exp2(cfg, test_size=0.2, val_size=0.2, seed=42):
     
     final_splits = {}
     for (dt, sat) in combos:
-        splits = build_splits_from_test_keys(cfg, dt, sat, test_keys, val_size, seed)
+        splits = build_splits_from_test_keys(base_dir, dt, sat, test_keys, val_size, seed)
         final_splits[f"{dt}_{sat}"] = splits
 
     # 3) Unify common test across all
@@ -431,10 +499,11 @@ def build_splits_exp2(cfg, test_size=0.2, val_size=0.2, seed=42):
 
         train_files = [base_dir / Path(f) for f in splits_dict["train"]]
         mean, std = compute_mean_std(train_files, n_workers=4)
-        logging.info(f"[Exp1] Mean={mean} Std={std}")
+        logging.info(f"[Exp2] Mean={mean}")
+        logging.info(f"[Exp2] Std={std}")
 
         for variant in ["dem", "no_dem"]:
-            output_dir = Path(cfg.experiment.dir) / variant / satellite
+            output_dir = Path(exp_dir) / variant / satellite
             output_dir.mkdir(parents=True, exist_ok=True)
 
             data_paths_file = output_dir / "data_paths.json"
@@ -445,19 +514,15 @@ def build_splits_exp2(cfg, test_size=0.2, val_size=0.2, seed=42):
             mean_std_file = output_dir / "norm_data.json"
             with open(mean_std_file, "w") as f:
                 f.write(json.dumps({"mean": mean.tolist(), "std": std.tolist()}, indent=2))
-            logging.info(f"[Exp1] Mean/Std saved to {mean_std_file}")
-            
-def build_splits_exp3(cfg, val_size=0.2, seed=42):
-    
-    base_dir = Path(cfg.base_dir)
-    satellite = cfg.experiment.preprocess.satellite
-    dataset_type = cfg.experiment.preprocess.dataset_type
-    cluster_dict = cfg.experiment.cluster_dict
-    patch_dir = base_dir / "data" / dataset_type / satellite
+            logging.info(f"[Exp2] Mean/Std saved to {mean_std_file}")
+
+def build_splits_exp3(base_dir, exp_dir, cluster_dict, val_size=0.2, seed=42):
+        
+    patch_dir = base_dir / "data" / "final" / "s2"	
     files = sorted(patch_dir.glob("*.nc"))
 
     for region, locations in cluster_dict.items():
-        logging.info(f"[Exp3] Using satellite={satellite}, variant={region}, N={len(files)}")
+        logging.info(f"[Exp3] Using satellite=s2_final, variant={region}, N={len(files)}")
         
         train_files = [f for f in files if not any(loc in f.name for loc in locations)]
         test_files = [f for f in files if any(loc.lower() in f.stem.lower() for loc in locations)]
@@ -476,7 +541,7 @@ def build_splits_exp3(cfg, val_size=0.2, seed=42):
         }
         logging.info(f"[Exp1] Train={len(train_files)} Val={len(val_files)} Test={len(test_files)}")
         
-        output_dir = Path(cfg.experiment.dir) / region / satellite
+        output_dir = Path(exp_dir) / region / "s2"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         data_paths_file = output_dir / "data_paths.json"
@@ -493,24 +558,30 @@ def build_splits_exp3(cfg, val_size=0.2, seed=42):
         with open(mean_std_file, "w") as f:
             f.write(json.dumps({"mean": mean.tolist(), "std": std.tolist()}, indent=2))
         logging.info(f"[Exp1] Mean/Std saved to {mean_std_file}")
-             
-@hydra.main(config_path="../../meta", config_name="config.yaml")
+            
+@hydra.main(config_path="../../configs", config_name="config.yaml", version_base="1.3.2")
 def main(cfg: DictConfig):
 
-    test_size = 0.2
-    val_size = 0.2
+    base_dir = Path(cfg.base_dir)
+    exp_dir = Path(cfg.experiment.dir)
     seed = 42
 
     np.random.seed(seed)
 
     if cfg.experiment.name == "exp1":
-        build_splits_exp1(cfg, test_size, val_size, seed)
+        test_size = 0.3 # will be reduce by unifying test set
+        val_size = 0.2
+        build_splits_exp1(base_dir, exp_dir, test_size, val_size, seed)
 
     elif cfg.experiment.name == "exp2":
-        build_splits_exp2(cfg, test_size, val_size, seed)
+        test_size, val_size = 0.2, 0.2
+        build_splits_exp2(base_dir, exp_dir, test_size, val_size, seed)
 
     elif cfg.experiment.name == "exp3":
-        build_splits_exp3(cfg, val_size, seed)
+        test_size, val_size = 0.2, 0.2 
+        cluster_dict = cfg.experiment.cluster_dict
+        build_splits_exp3(base_dir, exp_dir, cluster_dict, val_size, seed)
+
     else:
         raise ValueError(f"Unknown experiment name: {cfg.experiment.name}")
    
