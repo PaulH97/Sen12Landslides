@@ -72,7 +72,6 @@ def compute_mean_std(files, n_workers=4):
     # Peek at first sample => shape: (C, T*H*W) or (C, H, W) ...
     first_sample = dataset[0]
     n_bands = first_sample.shape[0]
-    logging.info(f"Found {len(files)} files, shape={first_sample.shape}, bands={n_bands}")
 
     # --- Pass 1: sum + count of non-NaN => mean
     sum_data = torch.zeros([n_bands], dtype=torch.float64)
@@ -159,11 +158,19 @@ def check_file_metadata(file_path, criteria):
                 return False, metadata
             
             # Check confidence value if present
-            confidence = ds.attrs.get("mean_confidence")
-            if confidence is not None and confidence != "None":
-                confidence = float(confidence)
+            if is_annotated == "True":
+                confidence_str = ds.attrs.get("date_confidence", "")
+                if confidence_str:
+                    try:
+                        confidence_values = confidence_str.split(",") if "," in confidence_str else [confidence_str]
+                        confidence_values = [float(c) for c in confidence_values]
+                        confidence = np.mean(confidence_values)
+                    except ValueError:
+                        confidence = 0.0
+                else:
+                    confidence = 0.0
             else:
-                confidence = 0.0
+                confidence = 1.0
             metadata["confidence"] = confidence
 
             if criteria.min_confidence is not None and confidence < criteria.min_confidence:
@@ -299,11 +306,8 @@ def file_key(file_path):
     """
     # Extract the base filename without extension
     base_name = file_path.stem
-    
-    # Remove satellite type identifiers to get the common location identifier
-    # Example: converting "location_123_s1asc.nc" and "location_123_s2.nc" to "location_123"
-    key = re.sub(r'_(s1asc|s1dsc|s2)$', '', base_name)
-    
+    # Remove the satellite identifier (e.g., '_s1asc', '_s1dsc', '_s2') from the base name
+    key = re.sub(r'_(s1asc|s1dsc|s2)', '', base_name)
     return key
 
 def to_rel(base_dir, paths):
@@ -311,22 +315,14 @@ def to_rel(base_dir, paths):
     return [str(p.relative_to(base_dir)) for p in paths]
 
 def build_reference_test_split(files, n_workers=4, test_size=0.2, seed=42):
-
-    # 1) coverage classes for all
     patch_array, coverage_array = compute_coverage_classes(files, n_workers=n_workers)
-
-    train_files, test_files = stratified_split(patch_array, coverage_array, test_size=test_size, seed=seed)
-    
-    logging.info(f"Train count= {len(train_files)} Test count = {len(test_files)}")
-
+    _, test_files = stratified_split(patch_array, coverage_array, test_size=test_size, seed=seed)
     test_keys  = {file_key(f) for f in test_files}
-
     return test_keys
 
 def build_splits_from_test_keys(files, test_keys, val_size=0.2, seed=42): 
     test_files = []
     leftover_list = []
-        
     for f in files:
         if file_key(f) in test_keys:
             test_files.append(f)
@@ -420,11 +416,8 @@ def unify_common_test_across_all(final_splits):
 def main(cfg: DictConfig):
 
     base_dir = Path(cfg.base_dir)
-    
     cfg_split = cfg.split_settings
-    output_dir = Path(cfg_split.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    
+    output_dir = Path(cfg_split.output_dir)    
     criteria = cfg_split.filter_criteria
     n_workers = cfg_split.n_workers
     test_size = cfg_split.test_size
@@ -434,12 +427,14 @@ def main(cfg: DictConfig):
     # 1) Filter files based on criteria
     satellite_files = {}
     for sat in criteria.satellites:
+        logging.info(f"Filtering files for {sat.upper()}...")
         files = list((base_dir / "data" / "final" / sat).glob("*.nc"))
         satellite_files[sat] = filter_files(files, criteria, n_workers)   
         
     # 2) Use reference satellite to build common test split
     ref_files = satellite_files.get(criteria.reference_sat)
     test_keys = build_reference_test_split(ref_files, n_workers, test_size, seed)
+    logging.info(f"Reference satellite: {criteria.reference_sat.upper()} Test={len(test_keys)}")
 
     satellite_splits = {}
     for sat in criteria.satellites:
@@ -451,9 +446,14 @@ def main(cfg: DictConfig):
         satellite_splits = unify_common_test_across_all(satellite_splits)
 
     for satellite, splits_dict in satellite_splits.items():
-        logging.info(f"{satellite.upper()}: Train={len(splits_dict['train'])} Val={len(splits_dict['val'])} Test={len(splits_dict['test'])}")
+        logging.info(f"[FINAL SPLIT] {satellite.upper()}: Train={len(splits_dict['train'])} Val={len(splits_dict['val'])} Test={len(splits_dict['test'])}")
         
-        data_paths_file = output_dir / satellite / "data_paths.json"
+        sat_output_dir = output_dir / satellite
+        sat_output_dir.mkdir(parents=True, exist_ok=True)
+
+        splits_dict = {k: to_rel(base_dir, v) for k, v in splits_dict.items()}
+
+        data_paths_file = sat_output_dir / "data_paths.json"
         with open(data_paths_file, "w") as f:
             f.write(json.dumps(splits_dict, indent=2))
         logging.info(f"Splits saved to {data_paths_file}")
@@ -465,12 +465,12 @@ def main(cfg: DictConfig):
         logging.info(f"Mean={mean}")
         logging.info(f"Std={std}")
         
-        mean_std_file = output_dir / satellite / "norm_data.json"
+        mean_std_file = sat_output_dir / "norm_data.json"
         with open(mean_std_file, "w") as f:
             f.write(json.dumps({"mean": mean.tolist(), "std": std.tolist()}, indent=2))
         logging.info(f"Mean/Std saved to {mean_std_file}")
 
-    cfg_dict = OmegaConf.to_container(cfg, resolve=True)
+    cfg_dict = OmegaConf.to_container(cfg_split, resolve=True)
     config_file = output_dir / "config.json"
     with open(config_file, "w") as f:
         json.dump(cfg_dict, f, indent=2)
