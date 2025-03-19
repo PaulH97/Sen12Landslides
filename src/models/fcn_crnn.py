@@ -238,12 +238,10 @@ def make_UNetEncoder_model(num_bands_dict, use_planet=True, resize_planet=False,
         model.enc4.encode[3] = pre_trained_features[7] # 128 in, 128 out
         model.center[0] = pre_trained_features[10]     # 128 in, 256 out
 
-    model = model()
     return model
 
 def make_UNetDecoder_model(n_class, late_feats_for_fcn, use_planet, resize_planet):
     model = UNet_Decode(n_class, late_feats_for_fcn, use_planet, resize_planet)
-    model = model()
     return model
 
 class CLSTMSegmenter(nn.Module):
@@ -368,9 +366,12 @@ class CLSTM(nn.Module):
         for layer_idx in range(self.lstm_num_layers):
             # double check that this is right? i.e not resetting every time to 0?
             #print(self.init_hidden_state)
-            h, c = self.init_hidden_state[layer_idx], self.init_cell_state[layer_idx]
+            h, c = self.init_hidden_state[layer_idx].to(input_tensor.device), self.init_cell_state[layer_idx].to(input_tensor.device)
             h = h.expand(input_tensor.size(0), h.shape[1], h.shape[2], h.shape[3])
             c = c.expand(input_tensor.size(0), c.shape[1], c.shape[2], c.shape[3])
+            # h, c = self.init_hidden_state[layer_idx], self.init_cell_state[layer_idx]
+            # h = h.expand(input_tensor.size(0), h.shape[1], h.shape[2], h.shape[3])
+            # c = c.expand(input_tensor.size(0), c.shape[1], c.shape[2], c.shape[3])
             output_inner_layers = []
             
             for t in range(seq_len):
@@ -491,7 +492,7 @@ class CGRUSegmenter(nn.Module):
         layer_output_list, last_state_list = self.cgru(inputs)
         final_state = last_state_list[0]
         if self.bidirectional:
-            rev_inputs = torch.tensor(inputs.cpu().detach().numpy()[::-1].copy(), dtype=torch.float32)()
+            rev_inputs = torch.tensor(inputs.cpu().detach().numpy()[::-1].copy(), dtype=torch.float32)
             rev_layer_output_list, rev_last_state_list = self.cgru(rev_inputs)
             final_state = torch.cat([final_state, rev_last_state_list[0][0]], dim=1)
         scores = self.conv(final_state)
@@ -559,7 +560,7 @@ class CGRU(nn.Module):
         for layer_idx in range(self.gru_num_layers):
             # double check that this is right? i.e not resetting every time to 0?
             h = self.init_hidden_state[layer_idx]
-            h = h.expand(input_tensor.size(0), h.shape[1], h.shape[2], h.shape[3])()
+            h = h.expand(input_tensor.size(0), h.shape[1], h.shape[2], h.shape[3])
             output_inner_layers = []
             
             for t in range(seq_len):

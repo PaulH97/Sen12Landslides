@@ -13,8 +13,6 @@ class UTAE(nn.Module):
     def __init__(
         self,
         num_channels,
-        shape_pattern,
-        batch_size,
         num_classes,
         encoder_widths=[64, 64, 64, 128],
         decoder_widths=[32, 32, 64, 128],
@@ -66,10 +64,9 @@ class UTAE(nn.Module):
             padding_mode (str): Spatial padding strategy for convolutional layers (passed to nn.Conv2d).
         """
         super(UTAE, self).__init__()
+        out_conv = [num_classes]
         self.num_classes = num_classes
         self.input_dim = num_channels
-        self.shape_pattern = shape_pattern
-        out_conv = [batch_size, num_classes]
         self.n_stages = len(encoder_widths)
         self.return_maps = return_maps
         self.encoder_widths = encoder_widths
@@ -131,11 +128,12 @@ class UTAE(nn.Module):
             d_k=d_k,
         )
         self.temporal_aggregator = Temporal_Aggregator(mode=agg_mode)
-        self.out_conv = ConvBlock(nkernels=[decoder_widths[0]] + out_conv, padding_mode=padding_mode)
-
+        # Directly map the output channels to num_classes
+        self.out_conv = ConvBlock(nkernels=[decoder_widths[0]] + out_conv, padding_mode=padding_mode, last_relu=False)
 
     def forward(self, input, batch_positions=None, return_att=False):
         pad_mask = ((input == self.pad_value).all(dim=-1).all(dim=-1).all(dim=-1))  # BxT pad mask [4,16]
+        pad_mask = torch.zeros_like(pad_mask, dtype=torch.bool) # we do not need padding 
         # Convolution 
         # Except for the first level, each block starts with a strided convolution
         out = self.in_conv.smart_forward(input)
@@ -424,7 +422,7 @@ class RecUNet(nn.Module):
         input_dim,
         encoder_widths=[64, 64, 64, 128],
         decoder_widths=[32, 32, 64, 128],
-        out_conv=[32, 20],
+        out_conv=[32, 2],
         str_conv_k=4,
         str_conv_s=2,
         str_conv_p=1,

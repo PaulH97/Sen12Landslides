@@ -99,6 +99,7 @@ class Sen12LsLitModule(LightningModule):
         preds = torch.argmax(logits, dim=1)
         self.train_metrics.update(preds, masks.int())
         self.log("train_loss", loss, on_step=False, on_epoch=True, sync_dist=True)
+        self.log("lr", self.trainer.optimizers[0].param_groups[0]["lr"], on_step=False, on_epoch=True, sync_dist=True)
         return loss
 
     def validation_step(self, batch, batch_idx):
@@ -149,9 +150,9 @@ class Sen12LsLitModule(LightningModule):
         self.log_dict(test_metrics, sync_dist=True)
         self.test_metrics.reset()
 
-    def setup(self, stage):
-        if self.hparams.compile and stage == "fit":
-            self.net = torch.compile(self.net)
+    # def setup(self, stage):
+    #     if self.hparams.compile and stage == "fit":
+    #         self.net = torch.compile(self.net)
 
     def configure_optimizers(self):
         optimizer = self.hparams.optimizer(params=self.trainer.model.parameters())
