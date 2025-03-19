@@ -5,7 +5,7 @@ name: unet_gru
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.001
+  lr: 0.0001
 
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau

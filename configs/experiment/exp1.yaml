@@ -1,7 +1,0 @@
-name: "exp1"
-description: "Experiment 01: Original Labels vs. Refined Labels"
-dir: "${base_dir}/experiments/exp1"
-variant: "final" # raw
-preprocess:
-  ref_dataset_type: "final"
-  ref_satellite: "s2"

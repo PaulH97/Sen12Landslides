@@ -5,7 +5,7 @@ name: utae
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.001
+  lr: 0.0001
 
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
@@ -17,9 +17,7 @@ scheduler:
 net:
   _target_: src.models.utae.UTAE
   num_channels: ${adjust_channels:${dataset.patch_channels}, ${experiment.variant}}
-  shape_pattern: NCTHW 
   num_classes: 2
-  batch_size: 4
   encoder_widths: [64, 64, 64, 128]
   decoder_widths: [32, 32, 64, 128]
   str_conv_k: 4

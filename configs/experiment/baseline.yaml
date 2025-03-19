@@ -1,4 +1,0 @@
-# experiment/baseline.yaml
-name: baseline
-description: "Baseline experiment for dataset testing"
-data_dir: "${base_dir}/data/${dataset_type}/${satellite.name}"

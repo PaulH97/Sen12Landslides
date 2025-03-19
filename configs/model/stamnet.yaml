@@ -1,11 +1,11 @@
 _target_: src.models.lit_module.Sen12LsLitModule
 
-name: convgru
+name: stamnet
 
 optimizer:
   _target_: torch.optim.Adam
   _partial_: true
-  lr: 0.0001
+  lr: 0.001
 
 scheduler:
   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
@@ -15,13 +15,13 @@ scheduler:
   patience: 5
 
 net:
-  _target_: src.models.convgru.ConvGRU_Seg
-  img_res: ${dataset.patch_size}
-  timeseries_len: ${dataset.patch_length}
+  _target_: src.models.stamnet.STAMNet
+  hidden_dim: 256
+  kernel_size: 3
+  num_layers: 2
   num_classes: 2
-  kernel_size: [3,3]
-  hidden_dim: 180
-  pad_value: 0
-  shape_pattern: 'NCTHW'
+  in_channels: 11
+  image_res: 128
+  patch_size: 16
 
 compile: False
