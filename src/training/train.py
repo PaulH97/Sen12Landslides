@@ -8,6 +8,7 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 import logging
 from pathlib import Path
+from lightning.pytorch import seed_everything
 
 from src.data.data_loading import get_dataloaders
 from src.utils.helpers import run_sanity_check
@@ -25,19 +26,24 @@ OmegaConf.register_new_resolver("adjust_channels", adjust_channels)
 def main(cfg):
     # logging.info(OmegaConf.to_yaml(cfg))
     try:
+        seed_everything(cfg.seed)
+        logging.info(f"Seed set to {cfg.seed}")
+
         train_loader, val_loader, test_loader = get_dataloaders(cfg)
         logging.info(f"Train dataset size: {len(train_loader.dataset)}, Val dataset size: {len(val_loader.dataset)}, Test dataset size: {len(test_loader.dataset)}")
 
-        # sanity check 
+        # Check the input shape of the data
+        sample_batch = next(iter(train_loader))
+        input_shape = sample_batch["img"].shape
+        logging.info(f"Input shape: {input_shape}")
+
+        # sanity check
         if cfg.sanity_check:
             for name, loader in {"train": train_loader, "val": val_loader, "test": test_loader}.items():
                 sanity_check_dir = Path("sanity_check") / name
                 sanity_check_dir.mkdir(parents=True, exist_ok=True)
                 run_sanity_check(loader, sanity_check_dir, num_samples=5)
         
-        logger = instantiate(cfg.logger)
-        callback = instantiate(cfg.callback)
-
         cfg_to_log = {
             "dataset": cfg.dataset.name,
             "model": cfg.model.name,
@@ -45,10 +51,14 @@ def main(cfg):
             "exp_variant": cfg.experiment.variant,
             "seed": cfg.seed,
         }
-        logger.experiment.config.update(cfg_to_log)
+        
+        callback = instantiate(cfg.callback)
+        # logger = instantiate(cfg.logger)
+        # Path(logger.save_dir).mkdir(parents=True, exist_ok=True)
+        # logger.experiment.config.update(cfg_to_log)
 
         trainer= Trainer(
-            logger=logger,
+            #logger=logger,
             callbacks=[callback],
             **cfg.trainer
         )
