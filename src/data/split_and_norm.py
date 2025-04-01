@@ -517,53 +517,70 @@ def build_splits_exp2(base_dir, exp_dir, test_size=0.2, val_size=0.2, seed=42):
             logging.info(f"[Exp2] Mean/Std saved to {mean_std_file}")
 
 def build_splits_exp3(base_dir, exp_dir, cluster_dict, val_size=0.2, seed=42):
-        
-    patch_dir = base_dir / "data" / "final" / "s2"	
+    """
+    Build splits for experiment 3 by ensuring no overlap between train and test files.
+    Each region in the cluster_dict defines the test set, and the remaining files are used for training/validation.
+    """
+    patch_dir = base_dir / "data" / "final" / "s2"
     files = sorted(patch_dir.glob("*.nc"))
 
     for region, locations in cluster_dict.items():
         logging.info(f"[Exp3] Using satellite=s2_final, variant={region}, N={len(files)}")
-        
-        train_files = [f for f in files if not any(loc in f.name for loc in locations)]
+
+        # Explicitly separate train and test files
         test_files = [f for f in files if any(loc.lower() in f.stem.lower() for loc in locations)]
+        train_files = [f for f in files if f not in test_files]
+
         logging.info(f"[Exp3] Train count = {len(train_files)} Test count = {len(test_files)}")
-        
-        # 1) coverage classes for all
+
+        # Ensure no overlap between train and test files
+        assert not set(train_files) & set(test_files), "Overlap detected between train and test files!"
+
+        # Compute coverage classes for train files
         n_workers = int(os.getenv('SLURM_CPUS_PER_TASK', 20))
         patch_array, coverage_array = compute_coverage_classes(train_files, n_workers=n_workers)
 
-        train_files, val_files = stratified_split(patch_array, coverage_array, test_size=val_size, seed=seed)
-        
+        # Stratified split for train and validation sets
+        if len(patch_array) > 0:
+            train_files, val_files = stratified_split(patch_array, coverage_array, test_size=val_size, seed=seed)
+        else:
+            train_files, val_files = [], []
+
         splits_dict = {
             "train": to_rel(base_dir, train_files),
             "val": to_rel(base_dir, val_files),
             "test": to_rel(base_dir, test_files)
         }
-        logging.info(f"[Exp1] Train={len(train_files)} Val={len(val_files)} Test={len(test_files)}")
-        
-        output_dir = Path(exp_dir) / region / "s2"
+
+        logging.info(f"[Exp3] Train={len(train_files)} Val={len(val_files)} Test={len(test_files)}")
+
+        # Save splits to output directory
+        output_dir = Path(exp_dir).parents[1] / region / "s2"
         output_dir.mkdir(parents=True, exist_ok=True)
 
         data_paths_file = output_dir / "data_paths.json"
         with open(data_paths_file, "w") as f:
             f.write(json.dumps(splits_dict, indent=2))
-        logging.info(f"[Exp1] Splits saved to {data_paths_file}")
+        logging.info(f"[Exp3] Splits saved to {data_paths_file}")
 
-        # 4) Compute mean/std for each split
-        train_files = [base_dir / Path(f) for f in splits_dict["train"]]
-        mean, std = compute_mean_std(train_files, n_workers=4)
-        logging.info(f"[Exp1] Mean={mean} Std={std}")
+        # Compute mean and std for the training set
+        train_files_full_path = [base_dir / Path(f) for f in splits_dict["train"]]
+        if train_files_full_path:
+            mean, std = compute_mean_std(train_files_full_path, n_workers=4)
+            logging.info(f"[Exp3] Mean={mean} Std={std}")
 
-        mean_std_file = output_dir / "norm_data.json"
-        with open(mean_std_file, "w") as f:
-            f.write(json.dumps({"mean": mean.tolist(), "std": std.tolist()}, indent=2))
-        logging.info(f"[Exp1] Mean/Std saved to {mean_std_file}")
+            mean_std_file = output_dir / "norm_data.json"
+            with open(mean_std_file, "w") as f:
+                f.write(json.dumps({"mean": mean.tolist(), "std": std.tolist()}, indent=2))
+            logging.info(f"[Exp3] Mean/Std saved to {mean_std_file}")
+        else:
+            logging.warning(f"[Exp3] No training files available for region {region}, skipping mean/std computation.")
             
 @hydra.main(config_path="../../configs", config_name="config.yaml", version_base="1.3.2")
 def main(cfg: DictConfig):
 
     base_dir = Path(cfg.base_dir)
-    exp_dir = Path(cfg.experiment.dir)
+    exp_dir = Path(cfg.exp_dir)
     seed = 42
 
     np.random.seed(seed)
@@ -579,7 +596,14 @@ def main(cfg: DictConfig):
 
     elif cfg.experiment.name == "exp3":
         test_size, val_size = 0.2, 0.2 
-        cluster_dict = cfg.experiment.cluster_dict
+        cluster_dict = {
+            "america": ["USA_Alaska", "USA_PuertoRico", "DominicaMaria"],
+            "europe": ["Italy"],
+            "africa": ["Chimanimani"],
+            "central_asia": ["China", "Hokkaido", "Hiroshima", "Kyrgyzstan1", "Kyrgyzstan2"],
+            "southeast_asia": ["Itogon", "LanaoDelNorte", "Indonesia", "Thrissur", "Nepal"],
+            "oceania": ["Newzealand", "PNG"]
+        }
         build_splits_exp3(base_dir, exp_dir, cluster_dict, val_size, seed)
 
     else:
