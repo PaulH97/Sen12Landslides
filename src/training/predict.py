@@ -1,7 +1,7 @@
 import torch
 import wandb
 from lightning import Trainer
-from lightning.pytorch.loggers import Logger
+from lightning.pytorch import seed_everything
 import gc
 import traceback
 import hydra
@@ -9,8 +9,7 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 import logging
 from pathlib import Path
-from omegaconf import DictConfig
-from typing import List
+import shutil
 from matplotlib import pyplot as plt
 import numpy as np
 import random
@@ -133,38 +132,57 @@ OmegaConf.register_new_resolver("adjust_channels", adjust_channels)
 
 @hydra.main(config_path="../../configs", config_name="config.yaml", version_base="1.3.2")
 def main(cfg):
-    logging.info(OmegaConf.to_yaml(cfg))
+    # logging.info(OmegaConf.to_yaml(cfg))
     try:
+        seed_everything(cfg.seed)
         train_loader, val_loader, test_loader = get_dataloaders(cfg)
         logging.info(f"Train dataset size: {len(train_loader.dataset)}, Val dataset size: {len(val_loader.dataset)}, Test dataset size: {len(test_loader.dataset)}")
-     
+             
+        # Check the input shape of the data
+        sample_batch = next(iter(train_loader))
+        input_shape = sample_batch["img"].shape
+        logging.info(f"Input shape: {input_shape}")
+
         callback = instantiate(cfg.callback)
+       
         ckpt_dir = Path(callback.dirpath)
-        ckpt_path = select_best_ckpt(ckpt_dir)
-
-        trainer= Trainer(
-            accelerator="gpu" if torch.cuda.is_available() else "cpu",
-            devices=1,
-            default_root_dir=cfg.log_dir,
-            callbacks=[callback]
-        )
-
-        model = instantiate(cfg.model)
-        predictions = trainer.predict(model=model, dataloaders=test_loader, ckpt_path=ckpt_path)
+        ckpt_files = list(ckpt_dir.glob("*.ckpt"))
 
         preds_dir = Path(cfg.output_dir) / "predictions"
+        if preds_dir.exists():
+            shutil.rmtree(preds_dir)
         preds_dir.mkdir(exist_ok=True, parents=True)
+
+        for idx, ckpt_path in enumerate(ckpt_files):
+
+            trainer= Trainer(
+                accelerator="gpu" if torch.cuda.is_available() else "cpu",
+                devices=1,
+                default_root_dir=cfg.output_dir,
+                callbacks=[callback]
+            )
+
+            model = instantiate(cfg.model)
+            predictions = trainer.predict(model=model, dataloaders=test_loader, ckpt_path=ckpt_path)
+            
+            if idx == 0:
+                random.seed(cfg.seed)
+                random_batches = random.sample(predictions, 2) 
+                for b_idx, batch in enumerate(random_batches):
+                    save_batch_predictions(batch, b_idx, preds_dir)
+            
+            preds = torch.cat([batch["preds"] for batch in predictions], dim=0)
+            masks = torch.cat([batch["masks"] for batch in predictions], dim=0)
+            pred_file = preds_dir / f"predictions_{idx}.pt"
+            torch.save({"preds": preds, "masks": masks}, pred_file)
         
-        random_batches = random.sample(predictions, 2) 
-        for idx, batch in enumerate(random_batches):
-            save_batch_predictions(batch, idx, preds_dir)
-        
-        preds = torch.cat([batch["preds"] for batch in predictions], dim=0)
-        masks = torch.cat([batch["masks"] for batch in predictions], dim=0)
-        pred_file = preds_dir / f"predictions.pt"
-        torch.save({"preds": preds, "masks": masks}, pred_file)
-        
-        logging.info(f"Predictions saved to {pred_file}")
+            logging.info(f"Predictions saved to {pred_file}")
+
+            del model
+            del trainer
+            del predictions
+            torch.cuda.empty_cache()
+            gc.collect()
 
     except Exception as e:
         traceback.print_exc()
