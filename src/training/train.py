@@ -9,6 +9,7 @@ from omegaconf import OmegaConf
 import logging
 from pathlib import Path
 from lightning.pytorch import seed_everything
+from datetime import datetime
 
 from src.data.data_loading import get_dataloaders
 from src.utils.helpers import run_sanity_check
@@ -26,7 +27,7 @@ OmegaConf.register_new_resolver("adjust_channels", adjust_channels)
 def main(cfg):
     # logging.info(OmegaConf.to_yaml(cfg))
     try:
-        seed_everything(cfg.seed)
+        # seed_everything(cfg.seed)
         logging.info(f"Seed set to {cfg.seed}")
 
         train_loader, val_loader, test_loader = get_dataloaders(cfg)
@@ -52,13 +53,15 @@ def main(cfg):
             "seed": cfg.seed,
         }
         
+        timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+        cfg.callback.filename = "{epoch}-{val_loss:.4f}" + f"-{timestamp}" 
         callback = instantiate(cfg.callback)
-        # logger = instantiate(cfg.logger)
-        # Path(logger.save_dir).mkdir(parents=True, exist_ok=True)
-        # logger.experiment.config.update(cfg_to_log)
+        logger = instantiate(cfg.logger)
+        Path(logger.save_dir).mkdir(parents=True, exist_ok=True)
+        logger.experiment.config.update(cfg_to_log)
 
         trainer= Trainer(
-            #logger=logger,
+            logger=logger,
             callbacks=[callback],
             **cfg.trainer
         )
