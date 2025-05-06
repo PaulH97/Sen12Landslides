@@ -1,6 +1,6 @@
 _target_: lightning.pytorch.callbacks.ModelCheckpoint
 dirpath: ${hydra:run.dir}/checkpoints                
-filename: "{epoch}-{val_loss:.4f}"                
+filename: "{epoch}-{val_loss:.4f}-%Y%m%d-%H%M%S"                
 monitor: "val_loss"                 
 verbose: False                
 save_last: null               
