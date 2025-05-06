@@ -1,0 +1,12 @@
+base_dir: Inventories/
+dataset_type: raw
+patch_size: 128
+overlap: 0
+timeseries_length: 15
+seed: 42
+tasks:
+  - name: stack_s1_bands
+  - name: stack_s2_bands
+  - name: extract_ndvi
+  - name: apply_dating
+  - name: create_patches
