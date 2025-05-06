@@ -1,10 +1,10 @@
 """
-Taken from https://github.com/TUM-LMF/MTLCC-pytorch/blob/master/src/models/convlstm/convlstm.py
-authors: TUM-LMF
+Taken from https://github.com/TUM-LMF/MTLCC-pytorch/blob/master/src/models/convlstm/convlstm.py and modified
 """
+
+import torch
 import torch.nn as nn
 from torch.autograd import Variable
-import torch
 
 
 class ConvLSTMCell(nn.Module):
@@ -205,7 +205,9 @@ class ConvLSTM(nn.Module):
 
 
 class ConvLSTM_Seg(nn.Module):
-    def __init__(self, num_classes, input_size, input_dim, hidden_dim, kernel_size, pad_value=0):
+    def __init__(
+        self, num_classes, input_size, input_dim, hidden_dim, kernel_size, pad_value=0
+    ):
         super(ConvLSTM_Seg, self).__init__()
 
         self.num_classes = num_classes
@@ -243,7 +245,8 @@ class ConvLSTM_Seg(nn.Module):
 
 class BConvLSTM_Seg(nn.Module):
     def __init__(
-        self, num_classes, input_size, input_dim, hidden_dim, kernel_size, pad_value):
+        self, num_classes, input_size, input_dim, hidden_dim, kernel_size, pad_value
+    ):
         super(BConvLSTM_Seg, self).__init__()
         self.num_classes = num_classes
         self.input_size = (input_size, input_size)

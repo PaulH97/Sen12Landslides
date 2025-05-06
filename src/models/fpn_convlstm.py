@@ -1,6 +1,7 @@
-import torch.nn as nn
 import torch
+import torch.nn as nn
 from src.models.convlstm import ConvLSTM
+
 
 class FPNConvLSTM(nn.Module):
     def __init__(
@@ -41,7 +42,9 @@ class FPNConvLSTM(nn.Module):
         self.pad_value = pad_value
 
         self.inconv_block = ConvBlock(
-            nkernels=[self.input_dim] + self.inconv, norm="group", pad_value=self.pad_value
+            nkernels=[self.input_dim] + self.inconv,
+            norm="group",
+            pad_value=self.pad_value,
         )
         self.pyramid = PyramidBlock(
             input_dim=self.inconv[-1],
@@ -140,7 +143,7 @@ class PyramidBlock(TemporallySharedBlock):
         """
         super(PyramidBlock, self).__init__(pad_value=pad_value)
 
-        dilations = [2 ** i for i in range(n_levels - 1)]
+        dilations = [2**i for i in range(n_levels - 1)]
         self.inconv = nn.Conv2d(input_dim, n_channels, kernel_size=3, padding=1)
         self.convs = nn.ModuleList(
             [

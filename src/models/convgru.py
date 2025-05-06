@@ -1,11 +1,12 @@
 """
 Original from https://github.com/TUM-LMF/MTLCC-pytorch/blob/master/src/models/convlstm/convlstm.py
 Modified from https://github.com/VSainteuf/utae-paps/blob/main/src/backbones/convgru.py
-
 """
+
+import torch
 import torch.nn as nn
 from torch.autograd import Variable
-import torch
+
 
 class ConvGRUCell(nn.Module):
     def __init__(self, input_size, input_dim, hidden_dim, kernel_size, bias):
@@ -62,6 +63,7 @@ class ConvGRUCell(nn.Module):
         return Variable(
             torch.zeros(batch_size, self.hidden_dim, self.height, self.width)
         ).to(device)
+
 
 class ConvGRU(nn.Module):
     def __init__(
@@ -151,7 +153,8 @@ class ConvGRU(nn.Module):
             output_inner = []
             for t in range(seq_len):
                 h = self.cell_list[layer_idx](
-                    input_tensor=cur_layer_input[:, t, :, :, :], cur_state=h)
+                    input_tensor=cur_layer_input[:, t, :, :, :], cur_state=h
+                )
                 output_inner.append(h)
 
             layer_output = torch.stack(output_inner, dim=1)
@@ -193,8 +196,18 @@ class ConvGRU(nn.Module):
             param = [param] * num_layers
         return param
 
+
 class ConvGRU_Seg(nn.Module):
-    def __init__(self, num_classes, img_res, timeseries_len, shape_pattern, kernel_size, hidden_dim, pad_value):
+    def __init__(
+        self,
+        num_classes,
+        img_res,
+        timeseries_len,
+        shape_pattern,
+        kernel_size,
+        hidden_dim,
+        pad_value,
+    ):
         super(ConvGRU_Seg, self).__init__()
 
         self.num_classes = num_classes
@@ -221,9 +234,13 @@ class ConvGRU_Seg(nn.Module):
         self.pad_value = self.pad_value
 
     def forward(self, input, batch_positions=None):
-        input = input.permute(0,2,1,3,4) # NTCHW -> NCTHW
-        assert input.shape[2] == self.input_dim, f"Input of ConvGRU should be for temporal dimension {self.input_dim}, here {input.shape[2]}"
-        pad_mask = ((input == self.pad_value).all(dim=-1).all(dim=-1).all(dim=-1))  # BxT pad mask
+        input = input.permute(0, 2, 1, 3, 4)  # NTCHW -> NCTHW
+        assert (
+            input.shape[2] == self.input_dim
+        ), f"Input of ConvGRU should be for temporal dimension {self.input_dim}, here {input.shape[2]}"
+        pad_mask = (
+            (input == self.pad_value).all(dim=-1).all(dim=-1).all(dim=-1)
+        )  # BxT pad mask
         pad_mask = pad_mask if pad_mask.any() else None
         _, out = self.convgru_encoder(input, pad_mask=pad_mask)
         out = self.classification_layer(out)

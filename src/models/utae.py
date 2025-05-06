@@ -1,13 +1,14 @@
 """
-U-TAE Implementation
-Author: Vivien Sainte Fare Garnot (github/VSainteuf)
-taken from: https://github.com/VSainteuf/utae-paps/tree/main
+Taken from: https://github.com/VSainteuf/utae-paps/tree/main
 """
+
+import copy
+
+import numpy as np
 import torch
 import torch.nn as nn
-from benchmarking.models.BiConvRNN.convlstm import ConvLSTM, BConvLSTM
-import numpy as np
-import copy
+from benchmarking.models.BiConvRNN.convlstm import BConvLSTM, ConvLSTM
+
 
 class UTAE(nn.Module):
     def __init__(
@@ -118,7 +119,8 @@ class UTAE(nn.Module):
                 norm="batch",
                 padding_mode=padding_mode,
             )
-            for i in range(self.n_stages - 1, 0, -1))
+            for i in range(self.n_stages - 1, 0, -1)
+        )
         self.temporal_encoder = LTAE2d(
             in_channels=encoder_widths[-1],
             d_model=d_model,
@@ -129,18 +131,28 @@ class UTAE(nn.Module):
         )
         self.temporal_aggregator = Temporal_Aggregator(mode=agg_mode)
         # Directly map the output channels to num_classes
-        self.out_conv = ConvBlock(nkernels=[decoder_widths[0]] + out_conv, padding_mode=padding_mode, last_relu=False)
+        self.out_conv = ConvBlock(
+            nkernels=[decoder_widths[0]] + out_conv,
+            padding_mode=padding_mode,
+            last_relu=False,
+        )
 
     def forward(self, input, batch_positions=None, return_att=False):
-        pad_mask = ((input == self.pad_value).all(dim=-1).all(dim=-1).all(dim=-1))  # BxT pad mask [4,16]
-        pad_mask = torch.zeros_like(pad_mask, dtype=torch.bool) # we do not need padding 
-        # Convolution 
+        pad_mask = (
+            (input == self.pad_value).all(dim=-1).all(dim=-1).all(dim=-1)
+        )  # BxT pad mask [4,16]
+        pad_mask = torch.zeros_like(
+            pad_mask, dtype=torch.bool
+        )  # we do not need padding
+        # Convolution
         # Except for the first level, each block starts with a strided convolution
         out = self.in_conv.smart_forward(input)
         feature_maps = [out]
         # SPATIAL ENCODER
         for i in range(self.n_stages - 1):
-            out = self.down_blocks[i].smart_forward(feature_maps[-1]) # dividing the resolution of the feature maps by a factor 2
+            out = self.down_blocks[i].smart_forward(
+                feature_maps[-1]
+            )  # dividing the resolution of the feature maps by a factor 2
             feature_maps.append(out)
         # TEMPORAL ENCODER
         out, att = self.temporal_encoder(
@@ -167,6 +179,7 @@ class UTAE(nn.Module):
             else:
                 return out
 
+
 class TemporallySharedBlock(nn.Module):
     """
     Helper module for convolutional encoding blocks that are shared across a sequence.
@@ -182,7 +195,9 @@ class TemporallySharedBlock(nn.Module):
 
     def smart_forward(self, input):
         if len(input.shape) == 4:
-            return self.forward(input) # probably when the timeseries has only one timestep -> shape BxCxHxW
+            return self.forward(
+                input
+            )  # probably when the timeseries has only one timestep -> shape BxCxHxW
         else:
             b, t, c, h, w = input.shape
 
@@ -209,6 +224,7 @@ class TemporallySharedBlock(nn.Module):
             _, c, h, w = out.shape
             out = out.view(b, t, c, h, w)
             return out
+
 
 class ConvLayer(nn.Module):
     def __init__(
@@ -258,6 +274,7 @@ class ConvLayer(nn.Module):
     def forward(self, input):
         return self.conv(input)
 
+
 class ConvBlock(TemporallySharedBlock):
     def __init__(
         self,
@@ -277,6 +294,7 @@ class ConvBlock(TemporallySharedBlock):
 
     def forward(self, input):
         return self.conv(input)
+
 
 class DownConvBlock(TemporallySharedBlock):
     def __init__(
@@ -316,6 +334,7 @@ class DownConvBlock(TemporallySharedBlock):
         out = out + self.conv2(out)
         return out
 
+
 class UpConvBlock(nn.Module):
     def __init__(
         self, d_in, d_out, k, s, p, norm="batch", d_skip=None, padding_mode="reflect"
@@ -347,6 +366,7 @@ class UpConvBlock(nn.Module):
         out = self.conv1(out)
         out = out + self.conv2(out)
         return out
+
 
 class Temporal_Aggregator(nn.Module):
     def __init__(self, mode="mean"):
@@ -411,6 +431,7 @@ class Temporal_Aggregator(nn.Module):
                 return out
             elif self.mode == "mean":
                 return x.mean(dim=1)
+
 
 class RecUNet(nn.Module):
     """Recurrent U-Net architecture. Similar to the U-TAE architecture but
@@ -525,7 +546,9 @@ class RecUNet(nn.Module):
             )
         elif temporal == "mono":
             self.temporal_encoder = None
-        self.out_conv = ConvBlock(nkernels=[decoder_widths[0]] + out_conv, padding_mode=padding_mode)
+        self.out_conv = ConvBlock(
+            nkernels=[decoder_widths[0]] + out_conv, padding_mode=padding_mode
+        )
 
     def forward(self, input, batch_positions=None):
         pad_mask = (
@@ -574,7 +597,8 @@ class RecUNet(nn.Module):
                 return out, maps
             else:
                 return out
-            
+
+
 class PositionalEncoder(nn.Module):
     def __init__(self, d, T=1000, repeat=None, offset=0):
         super(PositionalEncoder, self).__init__()
@@ -602,6 +626,7 @@ class PositionalEncoder(nn.Module):
             )
 
         return sinusoid_table
+
 
 class LTAE2d(nn.Module):
     def __init__(
@@ -686,8 +711,10 @@ class LTAE2d(nn.Module):
                 .repeat((1, 1, h))
                 .unsqueeze(-1)
                 .repeat((1, 1, 1, w))
-            )  # BxTxHxW 
-            pad_mask = (pad_mask.permute(0, 2, 3, 1).contiguous().view(sz_b * h * w, seq_len))
+            )  # BxTxHxW
+            pad_mask = (
+                pad_mask.permute(0, 2, 3, 1).contiguous().view(sz_b * h * w, seq_len)
+            )
         out = x.permute(0, 3, 4, 1, 2).contiguous().view(sz_b * h * w, seq_len, d)
         out = self.in_norm(out.permute(0, 2, 1)).permute(0, 2, 1)
 
@@ -720,6 +747,7 @@ class LTAE2d(nn.Module):
             return out, attn
         else:
             return out
+
 
 class MultiHeadAttention(nn.Module):
     """Multi-Head Attention module
@@ -778,8 +806,8 @@ class MultiHeadAttention(nn.Module):
         else:
             return output, attn
 
-class ScaledDotProductAttention(nn.Module):
 
+class ScaledDotProductAttention(nn.Module):
     """Scaled Dot-Product Attention
     Modified from github.com/jadore801120/attention-is-all-you-need-pytorch
     """
