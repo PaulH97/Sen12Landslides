@@ -1,10 +1,11 @@
-import random 
-import shutil
+import argparse
+import random
 from pathlib import Path
-import numpy as np
+
 import matplotlib.pyplot as plt
-import shutil
+import numpy as np
 import xarray as xr
+
 
 def run_sanity_check_xarray(xr_file, output_file):
     """
@@ -49,7 +50,9 @@ def run_sanity_check_xarray(xr_file, output_file):
     else:
         # Sentinel-2: require at least three bands for RGB.
         if len(bands) < 3:
-            raise ValueError("Need at least 3 bands for an RGB composite for Sentinel-2.")
+            raise ValueError(
+                "Need at least 3 bands for an RGB composite for Sentinel-2."
+            )
         for t in range(T):
             # Stack first three bands into an RGB image.
             rgb = np.stack([ds[b].values[t] for b in bands[:3]], axis=-1)
@@ -65,7 +68,7 @@ def run_sanity_check_xarray(xr_file, output_file):
     if "MASK" in ds.data_vars:
         extra_images.append(ds["MASK"].values[0])
         extra_vars.append("MASK")
-    
+
     # Total columns: time-series images + extra images.
     n_ts = len(ts_images)
     n_extra = len(extra_images)
@@ -101,20 +104,69 @@ def run_sanity_check_xarray(xr_file, output_file):
     plt.close()
     print(f"Saved sanity check to: {output_file}")
 
+
+def main(folder, output_folder, n_files=5):
+    """
+    Run sanity checks on a specified number of randomly selected netCDF files in a folder.
+    This function processes netCDF files by performing sanity checks and saving the results
+    as PNG images in a 'sanity_checks' subfolder. It randomly samples a specified number
+    of files from the given directory.
+    Args:
+        folder (str): Path to the directory containing netCDF files to check.
+        n_files (int, optional): Maximum number of files to process. Defaults to 5.
+    Returns:
+        None
+    Notes:
+        - Creates a 'sanity_checks' subdirectory in the input folder if it doesn't exist
+        - Skips processing if no netCDF files are found
+        - Catches and reports errors for individual file processing
+        - Calls the run_sanity_check_xarray function for each file
+    """
+    folder_path = Path(folder)
+    output_folder = Path(output_folder)
+    output_folder.mkdir(exist_ok=True)
+
+    # Find all netCDF files
+    nc_files = list(folder_path.glob("*.nc"))
+
+    if not nc_files:
+        print(f"No netCDF files found in {folder}")
+        return
+
+    # Sample n_files randomly (or all if fewer)
+    sample_files = random.sample(nc_files, min(n_files, len(nc_files)))
+
+    print(f"Running sanity checks on {len(sample_files)} files from {folder}")
+
+    for i, file_path in enumerate(sample_files):
+        output_file = output_folder / f"sanity_check_{file_path.stem}.png"
+        print(f"[{i+1}/{len(sample_files)}] Processing {file_path.name}")
+        try:
+            run_sanity_check_xarray(str(file_path), str(output_file))
+        except Exception as e:
+            print(f"Error processing {file_path.name}: {e}")
+
+
 if __name__ == "__main__":
 
-    out_dir = Path(f"/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/data/sanity_check")
-    if out_dir.exists():
-        shutil.rmtree(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    parser = argparse.ArgumentParser(description="Run sanity checks on netCDF files")
+    parser.add_argument(
+        "--folder", type=str, help="Path to folder containing netCDF files"
+    )
+    parser.add_argument(
+        "--output_folder",
+        type=str,
+        default="sanity_checks",
+        help="Path to output folder for sanity check images (default: 'sanity_checks')",
+    )
+    parser.add_argument(
+        "--n_files",
+        type=int,
+        default=5,
+        help="Number of files to randomly sample (default: 5)",
+    )
 
-    # file= Path("/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Inventories/patches_refined/S1-asc/chimanimani_s1asc_1246.nc")
-    # out_file = Path(f"/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/data/sanity_check/{file.stem}.png")
-    # run_sanity_check_xarray(file, out_file)
+    args = parser.parse_args()
+    main(args.folder, args.output_folder, args.n_files)
 
-    s2_files = Path("/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/data/raw/s1dsc").glob("*.nc")
-    s2_files = random.sample(list(s2_files), 20)
-    for file in s2_files:
-        out_file =  out_dir / f"{file.stem}.png"
-        out_file.parent.mkdir(parents=True, exist_ok=True)
-        run_sanity_check_xarray(file, out_file)
+    # python sanity_check.py --folder "Sen12Landslides/data/final/s2"
