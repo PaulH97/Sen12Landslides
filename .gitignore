@@ -6,7 +6,6 @@ src/models/stamnet.py
 
 # Ignore common large files and cache files
 *.log
-*.csv
 *.h5
 *.nc
 *.pkl
@@ -39,4 +38,4 @@ Thumbs.db
 outputs/
 results/
 multirun/
-
+sanity_checks/
