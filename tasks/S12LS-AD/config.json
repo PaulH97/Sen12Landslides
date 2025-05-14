@@ -1,0 +1,29 @@
+{
+  "input_dir": "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/data/final",
+  "output_dir": "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/tasks/S12LS-AD",
+  "filter_criteria": {
+    "include_patterns": [],
+    "exclude_patterns": [
+      "newzealand",
+      "kyrgyzstan1",
+      "kyrgyzstan2",
+      "indonesia"
+    ],
+    "satellites": [
+      "s1asc",
+      "s1dsc",
+      "s2"
+    ],
+    "reference_sat": "s2",
+    "unify_test": true,
+    "min_confidence": null,
+    "max_confidence": null,
+    "annotated_only": false,
+    "non_annotated_only": false,
+    "annotated_ratio": 0.5
+  },
+  "n_workers": 20,
+  "test_size": 0.2,
+  "val_size": 0.2,
+  "seed": 42
+}
