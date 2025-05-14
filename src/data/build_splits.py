@@ -687,6 +687,7 @@ def main(cfg: DictConfig):
 
     base_dir = Path(cfg.base_dir)
     cfg_split = cfg.split_settings
+    input_dir = Path(cfg_split.input_dir)
     output_dir = Path(cfg_split.output_dir)
     criteria = cfg_split.filter_criteria
     n_workers = cfg_split.n_workers
@@ -698,7 +699,7 @@ def main(cfg: DictConfig):
     satellite_files = {}
     for sat in criteria.satellites:
         logging.info(f"Filtering files for {sat.upper()}...")
-        files = list((base_dir / "data" / "final" / sat).glob("*.nc"))
+        files = list((input_dir / sat).glob("*.nc"))
         satellite_files[sat] = filter_files(files, criteria, n_workers)
 
     # 2) Use reference satellite to build common test split
@@ -729,15 +730,17 @@ def main(cfg: DictConfig):
         sat_output_dir = output_dir / satellite
         sat_output_dir.mkdir(parents=True, exist_ok=True)
 
-        splits_dict = {k: to_rel(base_dir, v) for k, v in splits_dict.items()}
+        # Create a shortened version with just the filename and parent folder
+        splits_dict = {k: to_rel(input_dir, v) for k, v in splits_dict.items()}
 
+        # Save the shortened paths
         data_paths_file = sat_output_dir / "data_paths.json"
         with open(data_paths_file, "w") as f:
             f.write(json.dumps(splits_dict, indent=2))
         logging.info(f"Splits saved to {data_paths_file}")
 
         # Add base_dir to train files to get full paths
-        splits_dict["train"] = [base_dir / Path(f) for f in splits_dict["train"]]
+        splits_dict["train"] = [input_dir / Path(f) for f in splits_dict["train"]]
 
         mean, std = compute_mean_std(splits_dict["train"], n_workers=20)
         logging.info(f"Mean={mean}")
