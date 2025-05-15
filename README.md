@@ -2,27 +2,34 @@
 This is the official repository for **Sen12Landslides**, a large-scale, multi-modal, and multi-temporal dataset for satellite-based landslide detection and spatio-temporal anomaly analysis. It includes over 100,000 annotated landslides and 12,000+ Sentinel-1, Sentinel-2, and DEM image patches (128x128) with precise pre- and post-event timestamps.
 (Paper-Link)
 
-The dataset can be downloaded under: LINK IS COMING SOON!
+The dataset can be downloaded under: https://huggingface.co/datasets/paulhoehn/Sen12Landslides
 
 ## Data Structure
 
 The dataset is organized into three main folders based on the satellite data source:
 
 ```
-data/
-├── s1asc/ 
-│   ├── s1asc_part01.tar.gz
-│   ├── ...
-|   └── s1asc_part14.tar.gz
-├── s1dsc/
-│   ├── s1dsc_part01.tar.gz
-│   ├── ...
-│   └── s1dsc_part13.tar.gz
-├── s2/
-│   ├── s2_part01.tar.gz
-│   ├── ...
-│   └── s2_part14.tar.gz
-└── checksums.sha512
+Sen12Landslides/
+├── data/                           # Raw NetCDF patches (compressed)                
+│   ├── s1asc/   
+│   ├── s1dsc/  
+│   └── s2/    
+│       └── part*.tar.gz         
+│
+├── tasks/                       
+│   ├── S12LS-LD/                   # Landslide detection
+│   │   ├── config.json          
+│   │   └── {s1asc,s1dsc,s2}/     
+│   │       ├── data_paths.json  
+│   │       └── norm_data.json   
+│   │
+│   └── S12LS-AD/                   # Anomaly detection
+│       ├── config.json          
+│       └── {s1asc,s1dsc,s2}/     
+│           ├── data_paths.json  
+│           └── norm_data.json   
+│
+└── inventories.shp.zip             # Landslide polygons
 ```
 
 Each ```tar``` folder contains multiple `.nc` files (NetCDF format), where each file corresponds to a specific geographic region and patch. The filenames follow the structure:
@@ -75,3 +82,5 @@ Attributes:
     crs:              EPSG:32632
 ```
 For the corresponding Sentinel-1 data, the overall structure remains the same, but the data variables are adapted to SAR input, containing `VV` and `VH` bands instead of optical bands. The metadata attributes are consistent across modalities, with the only change being the `satellite` attribute set to `"s1"` instead of `"s2"`.
+
+
