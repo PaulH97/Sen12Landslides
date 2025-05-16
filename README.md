@@ -150,4 +150,4 @@ Sentinel-1 patches are structured the same way but include SAR bands (`VV`, `VH`
 
 ---
 
-You’re now ready to build custom splits under `tasks/`, train models, and integrate into your pipeline.
+You’re now ready to build custom splits under `tasks/`, train models, and integrate the data in this pipeline.
