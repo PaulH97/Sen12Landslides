@@ -52,14 +52,6 @@ for sensor in s1asc s1dsc s2; do
 done
 ```
 
-Result:
-
-```
-data/s2/italy_s2_6982.nc
-data/s1asc/italy_s1asc_6982.nc
-… etc.
-```
-
 ---
 
 ## 3. Data Layout
@@ -75,13 +67,26 @@ Sen12Landslides/
 │   │   ├── italy_s1dsc_6982.nc
 │   │   ├── chimanimani_s1dsc_1024.nc
 │   │   └── ...
-│   ├── s2/
-│   │   ├── italy_s2_6982.nc
-│   │   ├── usa_puerto_rico_s2_73.nc
-│   │   └── ...
-│   └── inventories.shp.zip
-├── src/                   # code
-├── tasks/                 # splits & normalization configs
+│   └── s2/
+│       ├── italy_s2_6982.nc
+│       ├── chimanimani_s2_1024.nc
+│       └── ...
+├── tasks/
+│   ├── S12LS-AD/                      # Anomaly detection
+│   │   ├── config.json
+│   │   ├── s1asc/
+│   │   ├── s1dsc/
+│   │   └── s2/
+│   │       ├── data_paths.json
+│   │       └── norm_data.json
+│   └── S12LS-LD/                      # Landslide detection
+│       ├── config.json
+│       ├── s1asc/
+│       ├── s1dsc/
+│       └── s2/
+│           ├── data_paths.json
+│           └── norm_data.json
+├── src/                               # Data loaders, models, etc.
 ├── ...
 └── README.md
 ```
@@ -111,7 +116,7 @@ Opening a patch with xarray reveals its structure:
 
 ```python
 >>> import xarray as xr
->>> ds = xr.open_dataset("data/s2/italy_s2_6982.nc")
+>>> ds = xr.open_dataset("Sen12Landslides/data/s2/italy_s2_6982.nc")
 >>> ds
 <xarray.Dataset> Size: 6MB
 Dimensions:      (time: 15, x: 128, y: 128)
@@ -144,24 +149,5 @@ Attributes:
 Sentinel-1 patches are structured the same way but include SAR bands (`VV`, `VH`) instead of optical ones, and set `satellite="s1"` in the attributes.
 
 ---
-
-## 4. Quick Start
-
-```python
-from scripts/load_sen12landslides import create_dataloader
-
-loader = create_dataloader(
-    base_dir=".",           # repo root
-    task="S12LS-LD",        # or "S12LS-AD"
-    sensor="s2",            # "s1asc" or "s1dsc"
-    batch_size=8,
-    num_workers=4,
-    remove_dem=False        # True → drop DEM channel
-)
-
-for batch in loader:
-    print(batch["img"].shape, batch["msk"].shape)
-    break
-```
 
 You’re now ready to build custom splits under `tasks/`, train models, and integrate into your pipeline.
