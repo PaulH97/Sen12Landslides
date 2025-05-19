@@ -11,7 +11,7 @@ A large-scale, multi-modal, multi-temporal collection of 128×128px Sentinel-1/2
 
 ```bash
 # 1. Clone code repo
-git clone https://github.com/your-org/Sen12Landslides.git
+git clone https://github.com/PaulH97/Sen12Landslides.git
 cd Sen12Landslides
 
 # 2. Install HF CLI
