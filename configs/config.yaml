@@ -32,7 +32,7 @@ sanity_check: false
 seed: 42
 
 split_settings:
-  input_dir: ${base_dir}/data/final # change here to donwloaded folder - needs to contain the satellite folders
+  input_dir: ${base_dir}/data # needs to have the satellite folder(s) (s1asc, s1dsc and/or s2) with NetCDF files in it
   output_dir: ${base_dir}/tasks/S12LS-LD
   filter_criteria:
     include_patterns: []
