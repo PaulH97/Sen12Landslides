@@ -685,7 +685,6 @@ def unify_common_test_across_all(final_splits):
 @hydra.main(config_path="../../configs", config_name="config.yaml", version_base="1.3.2")
 def main(cfg: DictConfig):
 
-    base_dir = Path(cfg.base_dir)
     cfg_split = cfg.split_settings
     input_dir = Path(cfg_split.input_dir)
     output_dir = Path(cfg_split.output_dir)
