@@ -3,6 +3,66 @@ import shutil
 
 import matplotlib.pyplot as plt
 import numpy as np
+import xarray as xr
+
+
+def postprocess_s2_dataset(ds):
+    """
+    Apply ESA radiometric offset correction to Sentinel-2 L2A data.
+
+    - Looks for bands named B01…B12 in `ds`.
+    - If acquisition date is after 2022-01-25, subtracts 1000 from those bands.
+    - Returns a new Dataset with corrected band values and all other variables untouched.
+
+    Args:
+        ds (xarray.Dataset): must contain reflectance bands “B01”–“B12” and a time coord.
+
+    Returns:
+        xarray.Dataset: corrected Sentinel-2 dataset.
+    """
+    # identify reflectance bands
+    s2_bands = [b for b in ds.data_vars if b.startswith("B") and b[1:].isdigit()]
+    if not s2_bands:
+        return ds
+
+    # stack into (band, time, x, y)
+    da = ds[s2_bands].to_array(dim="band")
+
+    # get first timestamp
+    t0 = np.array(da.time.values)[0]
+    if np.datetime64("2022-01-25") < t0:
+        # subtract offset
+        mask = np.isin(da.band.values, s2_bands)
+        da.values[mask] = np.where(
+            np.isnan(da.values[mask]), np.nan, da.values[mask] - 1000
+        )
+
+    # unpack back into dataset and merge other vars
+    ds_corr = da.to_dataset(dim="band")
+    return xr.merge([ds_corr, ds.drop_vars(s2_bands)])
+
+
+def postprocess_s1_dataset(ds, epsilon=1e-6):
+    """
+    Convert Sentinel-1 RTC backscatter to decibels (dB) by applying 10 * log10 transform,
+    replacing any <=0 values with a small epsilon so that no NaNs are introduced.
+
+    Args:
+        ds (xarray.Dataset): must contain one or both of “VV”, “VH”.
+        epsilon (float): small floor value for non-positive backscatter (default 1e-6).
+
+    Returns:
+        xarray.Dataset: corrected Sentinel-1 dataset without NaNs.
+    """
+    ds_out = ds.copy()
+    for pol in ("VV", "VH"):
+        if pol in ds_out.data_vars:
+            da = ds_out[pol].values
+            # floor to epsilon
+            da_floored = np.where(da <= 0, epsilon, da)
+            # convert to dB
+            ds_out[pol] = 10 * np.log10(da_floored)
+    return ds_out
 
 
 def run_sanity_check(data_loader, output_dir, num_samples=10):
