@@ -7,7 +7,7 @@ A large-scale, multi-modal, multi-temporal collection of 128×128px Sentinel-1/2
 
 ---
 
-## 1. Setup
+## Setup
 
 ```bash
 # 1. Clone code repo
@@ -25,26 +25,6 @@ mkdir data
 huggingface-cli download paulhoehn/Sen12Landslides --repo-type dataset --local-dir data
 ```
 
-After cloning, you’ll have:
-
-```
-Sen12Landslides/
-├── data/
-│   ├── s1asc/             # s1asc_part01…s1asc_part13.tar.gz
-│   ├── s1dsc/             # s1dsc_part01…s1dsc_part12.tar.gz
-│   ├── s2/                # s2_part01…s2_part28.tar.gz
-│   ├── inventories.shp.zip
-│   └── ...
-├── src/                   # code
-├── tasks/
-├── ...            
-└── README.md
-```
-
----
-
-## 2. Extract
-
 Unpack all `.nc` patches so the custom loader can read them directly:
 
 ```bash
@@ -58,14 +38,15 @@ done
 
 ---
 
-## 3. Data Layout
+## Data Structure
 
 ```
 Sen12Landslides/
 ├── data/
 │   ├── ...
+│   ├── inventories.shp.zip
 │   ├── s1asc/
-│   │   ├── italy_s1asc_6982.nc
+│   │   ├── italy_s1asc_6982.nc        # <region>_<sensor>_<patch_id>.nc
 │   │   ├── chimanimani_s1asc_1024.nc
 │   │   └── ...
 │   ├── s1dsc/
@@ -77,45 +58,56 @@ Sen12Landslides/
 │       ├── chimanimani_s2_1024.nc
 │       └── ...
 ├── tasks/
-│   ├── S12LS-AD/                      # Anomaly detection
-│   │   ├── config.json
+│   ├── S12LS-AD/                      # Anomaly detection task configuration
+│   │   ├── config.json                # Task-level metadata
 │   │   ├── s1asc/
+│   │   │   ├── data_paths.json
+│   │   │   └── norm_data.json
 │   │   ├── s1dsc/
+│   │   │   ├── data_paths.json
+│   │   │   └── norm_data.json
 │   │   └── s2/
 │   │       ├── data_paths.json
 │   │       └── norm_data.json
-│   └── S12LS-LD/                      # Landslide detection
+│   └── S12LS-LD/                      # Landslide detection task configuration
 │       ├── config.json
 │       ├── s1asc/
+│       │   ├── data_paths.json
+│       │   └── norm_data.json
 │       ├── s1dsc/
+│       │   ├── data_paths.json
+│       │   └── norm_data.json
 │       └── s2/
 │           ├── data_paths.json
 │           └── norm_data.json
-├── src/                               # Data loaders, models, etc.
+├── src/                               # Source code: data loaders, model definitions, training scripts
 ├── ...
 └── README.md
 ```
 
-* **`inventories.shp.zip`**
+### Folder Descriptions
+
+* **`data/inventories.shp.zip`**
   A zipped shapefile containing all ground-truth landslide polygons. Each polygon corresponds to one mapped landslide and is spatially aligned with the image patches.
 
-* **NetCDF patches** (`.nc` files)
-  These files live in the `s1asc/`, `s1dsc/`, and `s2/` directories. Each patch is:
+* **NetCDF patches (`.nc` files)**
+  Contained in `s1asc/`, `s1dsc/`, and `s2/`. Each file represents a 128×128 patch with 15 time steps and includes:
 
-  * **Size:** 128 × 128 pixels
-  * **Time series length:** 15 observations
-  * **Contents:**
-    * One or more spectral or SAR bands
-    * A binary mask (`MASK`) marking landslide pixels
-    * Event metadata (`event_date`, `pre_post_dates`, etc.)
-    * **DEM** (digital elevation model)
-    * **SCL** (Scene Classification Layer, Sentinel-2 only)
+  * Sentinel-2: 10 bands (B02–B12), SCL, DEM, MASK, metadata
+  * Sentinel-1: 2 bands (VV, VH), DEM, MASK, metadata
 
-Filenames always follow:
+* **`tasks/`**
+  Contains task-specific configuration for anomaly detection (`S12LS-AD`) and landslide detection (`S12LS-LD`). Each task includes data splits (`data_paths.json`) and normalization statistics (`norm_data.json`) for each modality.
 
-```
-<region>_<sensor>_<id>.nc ->  italy_s2_6982.nc
-```
+* **`src/`**
+  Contains the codebase used to process, train, and evaluate models on the dataset. This includes:
+
+  * Dataset loaders
+  * Model architectures
+  * Training and evaluation pipelines
+  * Utility functions for pre or post-processing
+
+### Data Record 
 
 Opening a patch with xarray reveals its structure:
 
@@ -155,4 +147,4 @@ Sentinel-1 patches are structured the same way but include SAR bands (`VV`, `VH`
 
 ---
 
-You’re now ready to use the dataset: Build your custom splits, train models, apply post-processing etc..
+You’re now ready to work with the dataset — create custom splits, train and evaluate models.
