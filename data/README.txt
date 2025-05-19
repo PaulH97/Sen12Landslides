@@ -1,1 +1,0 @@
-This directory is intended for storing Sen12Landslides dataset files. Please refer to the main README file in the repository root for instructions on how to organize this data folder to use the code properly.
