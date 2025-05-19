@@ -1,6 +1,6 @@
 # Sen12Landslides: Spatio-Temporal Landslide & Anomaly Dataset
 
-A large-scale, multi-modal, multi-temporal collection of 128×128 Sentinel-1/2 + DEM patches with 75k landslide annotations.
+A large-scale, multi-modal, multi-temporal collection of 128×128px Sentinel-1/2 + DEM patches with 10m spatial resolution and with 75k landslide annotations.
 
 **Paper (coming soon) & dataset:**
 🔗 [https://huggingface.co/datasets/paulhoehn/Sen12Landslides](https://huggingface.co/datasets/paulhoehn/Sen12Landslides)
@@ -21,7 +21,8 @@ pip install --upgrade huggingface_hub
 huggingface-cli login  # paste your token from https://huggingface.co/settings/tokens
 
 # 4. Pull the dataset into `data/`
-huggingface-cli repo clone paulhoehn/Sen12Landslides --repo-type dataset data
+mkdir data
+huggingface-cli download paulhoehn/Sen12Landslides --repo-type dataset --local-dir data
 ```
 
 After cloning, you’ll have:
@@ -32,7 +33,8 @@ Sen12Landslides/
 │   ├── s1asc/             # s1asc_part01…s1asc_part13.tar.gz
 │   ├── s1dsc/             # s1dsc_part01…s1dsc_part12.tar.gz
 │   ├── s2/                # s2_part01…s2_part28.tar.gz
-│   └── inventories.shp.zip
+│   ├── inventories.shp.zip
+│   └── ...
 ├── src/                   # code
 ├── tasks/
 ├── ...            
@@ -43,12 +45,14 @@ Sen12Landslides/
 
 ## 2. Extract
 
-Unpack all `.nc` patches so your loader can read them directly:
+Unpack all `.nc` patches so the custom loader can read them directly:
 
 ```bash
 # From repo root:
 for sensor in s1asc s1dsc s2; do
-  tar -xzvf data/$sensor/*.tar.gz -C data/$sensor
+  for archive in data/$sensor/*.tar.gz; do
+    tar -xzvf "$archive" -C "data/$sensor" && rm "$archive" # remove compressed tar files after extraction 
+  done
 done
 ```
 
@@ -59,6 +63,7 @@ done
 ```
 Sen12Landslides/
 ├── data/
+│   ├── ...
 │   ├── s1asc/
 │   │   ├── italy_s1asc_6982.nc
 │   │   ├── chimanimani_s1asc_1024.nc
@@ -150,4 +155,4 @@ Sentinel-1 patches are structured the same way but include SAR bands (`VV`, `VH`
 
 ---
 
-You’re now ready to build custom splits under `tasks/`, train models, and integrate the data in this pipeline.
+You’re now ready to use the dataset: Build your custom splits, train models, apply post-processing etc..
