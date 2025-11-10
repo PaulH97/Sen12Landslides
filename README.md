@@ -151,5 +151,4 @@ You’re now ready to work with the dataset — create custom splits, train and 
 
 ## Evaluation Metrics
 Important: This dataset has severe class imbalance (~2% landslide, ~98% background). We recommend using imbalance-aware metrics such as Average Precision (AP), AUROC, or per-class F1/precision/recall for the landslide class.
-
-Note: Our paper reported macro-averaged metrics, which is suboptimal for imbalanced data as it can obscure minority class performance. For landslide detection, minority class metrics are most critical.
+Note: Our paper reported macro-averaged metrics.
