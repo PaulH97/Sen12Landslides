@@ -1,6 +1,6 @@
 {
-  "input_dir": "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/data/final",
-  "output_dir": "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/tasks/S12LS-AD",
+  "input_dir": "Sen12Landslides/data/final",
+  "output_dir": "Sen12Landslides/tasks/S12LS-AD",
   "filter_criteria": {
     "include_patterns": [],
     "exclude_patterns": [
