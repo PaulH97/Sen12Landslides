@@ -150,5 +150,7 @@ Sentinel-1 patches are structured the same way but include SAR bands (`VV`, `VH`
 You’re now ready to work with the dataset — create custom splits, train and evaluate models.
 
 ## Evaluation Metrics
-Important: This dataset has severe class imbalance (~2% landslide, ~98% background). We recommend using imbalance-aware metrics such as Average Precision (AP), AUROC, or per-class F1/precision/recall for the landslide class.
-Note: Our paper reported macro-averaged metrics.
+Important: This dataset has severe class imbalance (~2% landslide, ~98% background). For landslide detection tasks, we recommend using imbalance-aware metrics (AP, AUROC, 
+or per-class F1/precision/recall for landslides). Note: Our paper used macro-averaged metrics for technical validation.
+
+**Coming soon:** Updated benchmark table with more extensive metrics + S12LS-LD update for standardized evaluation.
