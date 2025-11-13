@@ -147,10 +147,30 @@ Sentinel-1 patches are structured the same way but include SAR bands (`VV`, `VH`
 
 ---
 
-You’re now ready to work with the dataset — create custom splits, train and evaluate models.
+## Creating Custom Splits
+
+Create train/val/test stratified splits with multi-modal alignment:
+```bash
+python src/data/create_splits.py
+```
+
+**Key settings** in `configs/config.yaml`:
+- `align_modalities: true` - Ensure all patches have all satellites (required for fusion)
+- `test_size: 0.2` / `val_size: 0.2` - Split ratios
+- `filter_criteria.annotated_only: true` - Only annotated patches
+
+Output includes `data_paths.json` (file lists), `norm_data.json` (statistics), and `patch_locations.geojson` (visualization).
+
+---
 
 ## Evaluation Metrics
-Important: This dataset has severe class imbalance (~2% landslide, ~98% background). For landslide detection tasks, we recommend using imbalance-aware metrics (AP, AUROC, 
-or per-class F1/precision/recall for landslides). Note: Our paper used macro-averaged metrics for technical validation.
+Sen12Landslides is characterized by severe class imbalance (~2% landslides). For a meaningful evaluation, we strongly recommend using metrics that focus on the positive (landslide) class:
+- Average Precision (AP)
+- Area Under the ROC Curve (AUROC)
+- F1-Score, Precision, and Recall for the landslide class
 
-**Coming soon:** Updated benchmark table with more extensive metrics + S12LS-LD update for standardized evaluation.
+_Note: This guidance differs from the macro-averaged metrics used in our paper. While macro-averaging was suitable for our paper's broad technical validation, the metrics recommended here provide a more direct and practical assessment of a model's ability to detect the rare landslide class._
+
+---
+
+**Coming soon:** Updated benchmark table with the recommended extensive metrics on the `S12LS-LD` for better benchmarking and comparison.
