@@ -46,7 +46,7 @@ Sen12Landslides/
 │   ├── ...
 │   ├── inventories.shp.zip
 │   ├── s1asc/
-│   │   ├── italy_s1asc_6982.nc        # <region>_<sensor>_<patch_id>.nc
+│   │   ├── italy_s1asc_6982.nc             # <region>_<sensor>_<patch_id>.nc
 │   │   ├── chimanimani_s1asc_1024.nc
 │   │   └── ...
 │   ├── s1dsc/
@@ -58,8 +58,11 @@ Sen12Landslides/
 │       ├── chimanimani_s2_1024.nc
 │       └── ...
 ├── tasks/
-│   ├── S12LS-AD/                      # Anomaly detection task configuration
-│   │   ├── config.json                # Task-level metadata
+│   ├── S12LS-AD/                           # Anomaly detection task configuration
+│   │   ├── config.json                     # Task-level metadata
+│   │   ├── patch_locations_s1asc.geojson   # Independent per modality
+│   │   ├── patch_locations_s1dsc.geojson   
+│   │   ├── patch_locations_s2.geojson       
 │   │   ├── s1asc/
 │   │   │   ├── data_paths.json
 │   │   │   └── norm_data.json
@@ -69,8 +72,9 @@ Sen12Landslides/
 │   │   └── s2/
 │   │       ├── data_paths.json
 │   │       └── norm_data.json
-│   └── S12LS-LD/                      # Landslide detection task configuration
+│   └── S12LS-LD/                           # Landslide detection task configuration
 │       ├── config.json
+│       ├── patch_locations.geojson         # Aligned across all modalities
 │       ├── s1asc/
 │       │   ├── data_paths.json
 │       │   └── norm_data.json
@@ -80,7 +84,7 @@ Sen12Landslides/
 │       └── s2/
 │           ├── data_paths.json
 │           └── norm_data.json
-├── src/                               # Source code: data loaders, model definitions, training scripts
+├── src/                                    # Source code: data loaders, model definitions, training scripts
 ├── ...
 └── README.md
 ```
@@ -97,8 +101,13 @@ Sen12Landslides/
   * Sentinel-1: 2 bands (VV, VH), DEM, MASK, metadata
 
 * **`tasks/`**
-  Contains task-specific configuration for anomaly detection (`S12LS-AD`) and landslide detection (`S12LS-LD`). Each task includes data splits (`data_paths.json`) and normalization statistics (`norm_data.json`) for each modality.
-
+  Contains task-specific configuration for anomaly detection (`S12LS-AD`) and landslide detection (`S12LS-LD`). Each task includes:
+  
+  * **`config.json`** - Task configuration (filters, split ratios, stratification method)
+  * **`patch_locations.geojson`** - Patch locations with split assignments (train/val/test) for visualization
+  * **Per-satellite folders** (`s1asc/`, `s1dsc/`, `s2/`) containing:
+    * `data_paths.json` - File paths for train/val/test splits
+    * `norm_data.json` - Mean/std statistics for normalization
 * **`src/`**
   Contains the codebase used to process, train, and evaluate models on the dataset. This includes:
 
