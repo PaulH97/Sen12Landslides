@@ -65,25 +65,25 @@ Sen12Landslides/
 │   │   ├── patch_locations_s2.geojson       
 │   │   ├── s1asc/
 │   │   │   ├── data_paths.json
-│   │   │   └── norm_data.json
+│   │   │   └── norm_data.json             
 │   │   ├── s1dsc/
 │   │   │   ├── data_paths.json
-│   │   │   └── norm_data.json
+│   │   │   └── norm_data.json              
 │   │   └── s2/
 │   │       ├── data_paths.json
-│   │       └── norm_data.json
+│   │       └── norm_data.json            
 │   └── S12LS-LD/                           # Landslide detection task configuration
 │       ├── config.json
 │       ├── patch_locations.geojson         # Aligned across all modalities
 │       ├── s1asc/
 │       │   ├── data_paths.json
-│       │   └── norm_data.json
+│       │   └── norm_data.json              
 │       ├── s1dsc/
 │       │   ├── data_paths.json
-│       │   └── norm_data.json
+│       │   └── norm_data.json             
 │       └── s2/
 │           ├── data_paths.json
-│           └── norm_data.json
+│           └── norm_data.json              
 ├── src/                                    # Source code: data loaders, model definitions, training scripts
 ├── ...
 └── README.md
@@ -107,7 +107,7 @@ Sen12Landslides/
   * **`patch_locations.geojson`** - Patch locations with split assignments (train/val/test) for visualization
   * **Per-satellite folders** (`s1asc/`, `s1dsc/`, `s2/`) containing:
     * `data_paths.json` - File paths for train/val/test splits
-    * `norm_data.json` - Mean/std statistics for normalization
+    * `norm_data.json` - Mean/std statistics for normalization (last channel is always the DEM data)
 * **`src/`**
   Contains the codebase used to process, train, and evaluate models on the dataset. This includes:
 
