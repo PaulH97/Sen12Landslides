@@ -53,12 +53,8 @@ Sen12Landslides/
 │   │   ├── chimanimani_s1asc_1024.nc
 │   │   └── ...
 │   ├── s1dsc/
-│   │   ├── italy_s1dsc_6982.nc
-│   │   ├── chimanimani_s1dsc_1024.nc
 │   │   └── ...
 │   └── s2/
-│       ├── italy_s2_6982.nc
-│       ├── chimanimani_s2_1024.nc
 │       └── ...
 ├── tasks/
 │   ├── S12LS-AD/                           # Anomaly detection task configuration
@@ -70,56 +66,73 @@ Sen12Landslides/
 │   │   │   ├── data_paths.json
 │   │   │   └── norm_data.json             
 │   │   ├── s1dsc/
-│   │   │   ├── data_paths.json
-│   │   │   └── norm_data.json              
+│   │   │   └── ...           
 │   │   └── s2/
-│   │       ├── data_paths.json
-│   │       └── norm_data.json            
+│   │       └── ...         
 │   └── S12LS-LD/                           # Landslide detection task configuration
 │       ├── config.json
+│       ├── splits.json                     # Train/val/test splits with data paths
+│       ├── norm.json                       # Normalization values across modalities
 │       ├── patch_locations.geojson         # Aligned across all modalities
 │       ├── s1asc/
 │       │   ├── data_paths.json
 │       │   └── norm_data.json              
 │       ├── s1dsc/
-│       │   ├── data_paths.json
-│       │   └── norm_data.json             
+│       │   └── ...          
 │       └── s2/
-│           ├── data_paths.json
-│           └── norm_data.json              
+│           └── ...            
 ├── src/                                    # Source code: data loaders, model definitions, training scripts
 ├── ...
 └── README.md
 ```
 
-### Folder Descriptions
+### Core Data Files (`data/`)
 
-* **`data/inventories.shp.zip`**
-  A zipped shapefile containing all ground-truth landslide polygons. Each polygon corresponds to one mapped landslide and is spatially aligned with the image patches.
+**`inventories.shp.zip`**:
+Zipped shapefile containing ground-truth landslide polygons. Each polygon represents one mapped landslide event, spatially aligned with image patches.
 
-* **NetCDF patches (`.nc` files)**
-  Contained in `s1asc/`, `s1dsc/`, and `s2/`. Each file represents a 128×128 patch with 15 time steps and includes:
+**Satellite Image Patches** (`s1asc/`, `s1dsc/`, `s2/`)
+NetCDF files (`.nc`) with 128×128 pixel patches across 15 time steps:
+- **Sentinel-1**: 2 polarizations (VV, VH), DEM, landslide mask (MASK), and metadata
+- **Sentinel-2**: 10 spectral bands (B02–B08, B8A, B11–B12), Scene Classification Layer (SCL), DEM, landslide mask (MASK), and metadata
 
-  * Sentinel-2: 10 bands (B02–B12), SCL, DEM, MASK, metadata
-  * Sentinel-1: 2 bands (VV, VH), DEM, MASK, metadata
+### Task Configurations (`tasks/`)
 
-* **`tasks/`**
-  Contains task-specific configuration for anomaly detection (`S12LS-AD`) and landslide detection (`S12LS-LD`). Each task includes:
-  
-  * **`config.json`** - Task configuration (filters, split ratios, stratification method)
-  * **`patch_locations.geojson`** - Patch locations with split assignments (train/val/test) for visualization
-  * **Per-satellite folders** (`s1asc/`, `s1dsc/`, `s2/`) containing:
-    * `data_paths.json` - File paths for train/val/test splits
-    * `norm_data.json` - Mean/std statistics for normalization (last channel is always the DEM data)
-* **`src/`**
-  Contains the codebase used to process, train, and evaluate models on the dataset. This includes:
+Pre-configured splits for anomaly detection (`S12LS-AD/`) and landslide detection (`S12LS-LD/`).
 
-  * Dataset loaders
-  * Model architectures
-  * Training and evaluation pipelines
-  * Utility functions for pre or post-processing
+#### Always Generated
+| File | Description |
+|------|-------------|
+| `config.json` | Filter criteria, split ratios, and stratification settings |
+| `patch_locations.geojson` | Geographic patch locations with train/val/test assignments |
 
-### Data Record 
+#### Per-Satellite Folders (`s1asc/`, `s1dsc/`, `s2/`)
+| File | Description |
+|------|-------------|
+| `data_paths.json` | Train/val/test file paths (relative to data directory) |
+| `norm_data.json` | Per-band normalization statistics (mean/std) |
+
+#### Multi-Modal Files (when `align_modalities: true`)
+| File | Description |
+|------|-------------|
+| `splits.json` | Unified splits with file paths for all satellites and annotated pixel counts |
+| `norm.json` | Combined normalization statistics across all modalities |
+
+**Usage:**
+- **Single-modal**: Load `<satellite>/data_paths.json` + `<satellite>/norm_data.json`
+- **Multi-modal**: Load `splits.json` + `norm.json` for cross-modal fusion
+- **Visualization**: Open `patch_locations.geojson` in QGIS or mapping tools
+
+### Source Code (`src/`)
+
+Processing, training, and evaluation codebase:
+- **Dataset loaders** for NetCDF patches
+- **Model architectures** (CNNs, transformers, fusion networks)
+- **Training pipelines** with experiment tracking
+- **Evaluation scripts** for metrics and visualization
+- **Preprocessing utilities** for data augmentation and normalization
+
+## Data Record 
 
 Opening a patch with xarray reveals its structure:
 
@@ -157,8 +170,6 @@ Attributes:
 
 Sentinel-1 patches are structured the same way but include SAR bands (`VV`, `VH`) instead of optical ones, and set `satellite="s1"` in the attributes.
 
----
-
 ## Creating Custom Splits
 
 Create train/val/test stratified splits with multi-modal alignment:
@@ -173,7 +184,6 @@ python src/data/create_splits.py
 
 Output includes `data_paths.json` (file lists), `norm_data.json` (statistics), and `patch_locations.geojson` (visualization).
 
----
 
 ## Evaluation Metrics
 Sen12Landslides is characterized by severe class imbalance (~2% landslides). For a meaningful evaluation, we strongly recommend using metrics that focus on the positive (landslide) class:
