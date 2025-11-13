@@ -1,6 +1,7 @@
 {
-  "input_dir": "Sen12Landslides/data/final",
+  "input_dir": "Sen12Landslides/data_local/final",
   "output_dir": "Sen12Landslides/tasks/S12LS-LD",
+  "export_geodataframe": true,
   "filter_criteria": {
     "include_patterns": [],
     "exclude_patterns": [],
@@ -9,16 +10,14 @@
       "s1dsc",
       "s2"
     ],
-    "reference_sat": "s2",
-    "unify_test": true,
-    "min_confidence": null,
-    "max_confidence": null,
-    "annotated_only": false,
+    "annotated_only": true,
     "non_annotated_only": false,
-    "annotated_ratio": 0.8
+    "annotated_ratio": null,
+    "min_confidence": null,
+    "max_confidence": null
   },
-  "n_workers": 20,
   "test_size": 0.2,
   "val_size": 0.2,
-  "seed": 42
+  "seed": 42,
+  "n_workers": 20
 }

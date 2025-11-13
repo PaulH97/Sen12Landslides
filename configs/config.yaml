@@ -33,7 +33,7 @@ seed: 42
 
 split_settings:
   input_dir: ${base_dir}/data_local/final
-  output_dir: ${base_dir}/tasks/S12LS-AD_new
+  output_dir: ${base_dir}/tasks/S12LS-AD
   export_geodataframe: true # Export GeoDataFrame of splits
   align_modalities: false  # Ensure all modalities are aligned
   filter_criteria:
