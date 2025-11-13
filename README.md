@@ -2,7 +2,10 @@
 
 A large-scale, multi-modal, multi-temporal collection of 128×128px Sentinel-1/2 + DEM patches with 10m spatial resolution and with 75k landslide annotations.
 
-**Paper (coming soon) & dataset:**
+**Paper**:
+🔗 [https://www.nature.com/articles/s41597-025-06167-a](https://www.nature.com/articles/s41597-025-06167-a)
+
+**Dataset**: 
 🔗 [https://huggingface.co/datasets/paulhoehn/Sen12Landslides](https://huggingface.co/datasets/paulhoehn/Sen12Landslides)
 
 ---
