@@ -1,7 +1,8 @@
 {
-  "input_dir": "Sen12Landslides/data_local/final",
-  "output_dir": "Sen12Landslides/tasks/S12LS-LD",
+  "input_dir": "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/data_local/final",
+  "output_dir": "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/tasks/S12LS-LD",
   "export_geodataframe": true,
+  "align_modalities": true,
   "filter_criteria": {
     "include_patterns": [],
     "exclude_patterns": [],
