@@ -32,23 +32,23 @@ sanity_check: false
 seed: 42
 
 split_settings:
-  input_dir: ${base_dir}/data # needs to have the satellite folder(s) (s1asc, s1dsc and/or s2) with NetCDF files in it
-  output_dir: ${base_dir}/tasks/S12LS-LD
+  input_dir: ${base_dir}/data_local/final
+  output_dir: ${base_dir}/tasks/S12LS-AD_new
+  export_geodataframe: true # Export GeoDataFrame of splits
+  align_modalities: false  # Ensure all modalities are aligned
   filter_criteria:
     include_patterns: []
-    exclude_patterns: [] # ["newzealand", "kyrgyzstan1", "kyrgyzstan2", "indonesia"]
-    satellites: ["s1asc", "s1dsc", "s2"]
-    reference_sat: "s2"
-    unify_test: true
-    min_confidence: null
-    max_confidence: null
-    annotated_only: false
-    non_annotated_only: false
-    annotated_ratio: 0.8
-  n_workers: 20
-  test_size: 0.2
-  val_size: 0.2
+    exclude_patterns: []  # e.g., ["newzealand", "kyrgyzstan1"]
+    satellites: ["s1asc", "s1dsc", "s2"]  # e.g., ["s1asc", "s1dsc", "s2"]
+    annotated_only: false        # Keep only annotated files
+    non_annotated_only: false   # Keep only non-annotated files
+    annotated_ratio: null       # If mixing both, ratio of annotated (0.0-1.0)
+    min_confidence: null  # e.g., 0.7 to keep only patches with high-confidence dates
+    max_confidence: null  # e.g., 0.5 to keep only patches with low-confidence dates
+  test_size: 0.2   # 20% for testing
+  val_size: 0.2    
   seed: 42
+  n_workers: 20
 
 hydra:
   run:
