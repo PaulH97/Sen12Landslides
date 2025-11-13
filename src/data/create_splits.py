@@ -14,8 +14,6 @@ from torch.utils.data import DataLoader, Dataset
 from tqdm import tqdm
 import geopandas as gpd
 from shapely.geometry import Point
-from sklearn.cluster import KMeans
-from collections import defaultdict
     
 
 class NetCDFDataset(Dataset):
@@ -673,11 +671,12 @@ def extract_coordinates(file_path):
         return {'file': file_path, 'x': 0.0, 'y': 0.0, 'crs': 'EPSG:4326'}
 
 
-def create_splits_geodataframe(satellite_splits, satellite_files):
+def create_splits_geodataframe(satellite_splits, satellite_files, n_workers=20):
     """
     Create a GeoDataFrame with patch locations and split assignments.
     
     Uses CRS information from NetCDF files and transforms to WGS84 for compatibility.
+    Parallelized for faster processing.
     
     Parameters
     ----------
@@ -685,6 +684,8 @@ def create_splits_geodataframe(satellite_splits, satellite_files):
         Dictionary mapping satellite name to splits dict
     satellite_files : dict
         Dictionary mapping satellite name to list of file paths
+    n_workers : int, optional
+        Number of parallel workers, default 20
         
     Returns
     -------
@@ -703,16 +704,22 @@ def create_splits_geodataframe(satellite_splits, satellite_files):
         for file_path in ref_splits[split_name]:
             path_to_split[str(file_path)] = split_name
     
-    # Extract coordinates and create records
-    records = []
+    # Get reference files
     ref_files = satellite_files[ref_sat]
-        
-    for file_path in tqdm(ref_files, desc="Creating GeoDataFrame"):
+    
+    # Parallel coordinate extraction
+    logging.info(f"Extracting coordinates from {len(ref_files)} files using {n_workers} workers...")
+    coord_results = Parallel(n_jobs=n_workers)(
+        delayed(extract_coordinates)(file_path) 
+        for file_path in tqdm(ref_files, desc="Extracting coordinates")
+    )
+    
+    # Build records with extracted coordinates
+    records = []
+    for coord_data in coord_results:
+        file_path = coord_data['file']
         patch_id = file_key(file_path)
         split_name = path_to_split.get(str(file_path), 'unknown')
-        
-        # Extract coordinates using the updated function
-        coord_data = extract_coordinates(file_path)
         
         records.append({
             'patch_id': patch_id,
@@ -729,12 +736,13 @@ def create_splits_geodataframe(satellite_splits, satellite_files):
     # Create DataFrame
     df = pd.DataFrame(records)
     
+    logging.info("Transforming coordinates to WGS84...")
+    
     # Group by CRS and create geometries
     crs_groups = df.groupby('crs_original')
     gdfs = []
     
-    for crs_name, group in crs_groups:
-        
+    for crs_name, group in crs_groups:        
         # Create geometry with original CRS
         geometry = [Point(row['x'], row['y']) for _, row in group.iterrows()]
         gdf_group = gpd.GeoDataFrame(group, geometry=geometry, crs=crs_name)
@@ -754,7 +762,11 @@ def create_splits_geodataframe(satellite_splits, satellite_files):
     gdf['lat'] = gdf.geometry.y
     
     # Log statistics
-    logging.info(f"GeoDataFrame created with {len(gdf)} patches:")
+    logging.info(f"GeoDataFrame created with {len(gdf)} patches")
+    logging.info(f"  Train: {len(gdf[gdf['split'] == 'train'])}")
+    logging.info(f"  Val: {len(gdf[gdf['split'] == 'val'])}")
+    logging.info(f"  Test: {len(gdf[gdf['split'] == 'test'])}")
+    
     return gdf
 
 
@@ -912,6 +924,227 @@ def map_patch_ids_to_files(aligned_files, patch_id_splits):
     return satellite_splits
 
 
+def get_band_names(file_path, exclude_vars=("MASK", "SCL", "spatial_ref")):
+    """
+    Extract band/variable names from a NetCDF file.
+    
+    Parameters
+    ----------
+    file_path : Path
+        Path to NetCDF file
+    exclude_vars : tuple
+        Variables to exclude
+        
+    Returns
+    -------
+    list
+        List of variable names
+    """
+    try:
+        with xr.open_dataset(file_path) as ds:
+            return [var for var in ds.data_vars if var not in exclude_vars]
+    except Exception as e:
+        logging.warning(f"Error reading band names from {file_path}: {e}")
+        return []
+
+
+def compute_mean_std_with_bands(files, n_workers=4):
+    """
+    Compute per-band mean and standard deviation with band names.
+    
+    Parameters
+    ----------
+    files : list
+        List of NetCDF file paths
+    n_workers : int, optional
+        Number of worker processes, default 4
+        
+    Returns
+    -------
+    tuple
+        (mean_dict: dict, std_dict: dict, band_names: list)
+    """
+    if not files:
+        logging.warning("No files provided to compute mean/std!")
+        return {}, {}, []
+
+    # Get band names from first file
+    band_names = get_band_names(files[0])
+    
+    if not band_names:
+        logging.warning("No bands found in files!")
+        return {}, {}, []
+    
+    # Compute mean and std tensors
+    mean_tensor, std_tensor = compute_mean_std(files, n_workers)
+    
+    # Convert to dictionaries with band names as keys
+    mean_dict = {band: float(mean_tensor[i]) for i, band in enumerate(band_names)}
+    std_dict = {band: float(std_tensor[i]) for i, band in enumerate(band_names)}
+    
+    return mean_dict, std_dict, band_names
+
+
+def count_annotated_pixels(file_path):
+    """
+    Count the number of annotated (landslide) pixels in a patch.
+    
+    Parameters
+    ----------
+    file_path : Path
+        Path to NetCDF file containing MASK data
+        
+    Returns
+    -------
+    int
+        Number of pixels with value 1 in MASK
+    """
+    try:
+        with xr.open_dataset(file_path) as ds:
+            if "MASK" in ds.data_vars:
+                mask = ds["MASK"].values
+                # Handle different time dimensions
+                if mask.ndim == 3:  # (time, H, W)
+                    mask = mask[0]  # Take first timestep
+                elif mask.ndim == 2:  # (H, W)
+                    pass
+                return int(np.sum(mask == 1))
+            else:
+                return 0
+    except Exception as e:
+        logging.warning(f"Error counting annotated pixels in {file_path}: {e}")
+        return 0
+
+
+def create_global_splits_json(satellite_splits, satellite_files, input_dir, output_dir):
+    """
+    Create a global splits.json with all patch information.
+    
+    Parameters
+    ----------
+    satellite_splits : dict
+        Dictionary mapping satellite name to splits dict
+    satellite_files : dict
+        Dictionary mapping satellite name to list of file paths
+    input_dir : Path
+        Input directory base path
+    output_dir : Path
+        Output directory for saving JSON
+    """
+    logging.info("Creating global splits.json...")
+    
+    # Get all patch IDs from first satellite
+    ref_sat = list(satellite_files.keys())[0]
+    all_patches = {}
+    
+    # Build mapping from patch_id to files for each satellite
+    for sat, files in satellite_files.items():
+        for file_path in files:
+            patch_id = file_key(file_path)
+            if patch_id not in all_patches:
+                all_patches[patch_id] = {}
+            all_patches[patch_id][sat] = file_path
+    
+    # Determine split for each patch
+    patch_to_split = {}
+    for split_name in ['train', 'val', 'test']:
+        for file_path in satellite_splits[ref_sat][split_name]:
+            patch_id = file_key(file_path)
+            patch_to_split[patch_id] = split_name
+    
+    # Create splits structure
+    splits = {'train': [], 'val': [], 'test': []}
+    
+    for patch_id in sorted(all_patches.keys()):
+        split_name = patch_to_split.get(patch_id, 'unknown')
+        
+        # Build entry for this patch
+        entry = {'id': patch_id}
+        
+        # Add file paths for each satellite (as relative paths)
+        for sat in sorted(satellite_files.keys()):
+            if sat in all_patches[patch_id]:
+                rel_path = str(all_patches[patch_id][sat].relative_to(input_dir))
+                entry[sat] = rel_path
+        
+        # Count annotated pixels (use any satellite, they should all have same MASK)
+        first_sat = list(all_patches[patch_id].keys())[0]
+        pixel_count = count_annotated_pixels(all_patches[patch_id][first_sat])
+        entry['pixel_annotated'] = pixel_count
+        
+        splits[split_name].append(entry)
+    
+    # Save to file
+    output_file = output_dir / "splits.json"
+    with open(output_file, 'w') as f:
+        json.dump(splits, f, indent=2)
+    
+    logging.info(f"Global splits.json saved to {output_file}")
+    logging.info(f"  Train: {len(splits['train'])} patches")
+    logging.info(f"  Val: {len(splits['val'])} patches")
+    logging.info(f"  Test: {len(splits['test'])} patches")
+
+
+def create_global_norm_json(satellite_splits, input_dir, output_dir, n_workers=4):
+    """
+    Create a global norm.json with normalization statistics for all modalities.
+    
+    Parameters
+    ----------
+    satellite_splits : dict
+        Dictionary mapping satellite name to splits dict
+    input_dir : Path
+        Input directory base path
+    output_dir : Path
+        Output directory for saving JSON
+    n_workers : int
+        Number of worker processes
+    """
+    logging.info("Creating global norm.json...")
+    
+    norm_data = {}
+    
+    for sat, splits_dict in sorted(satellite_splits.items()):
+        logging.info(f"Computing normalization for {sat.upper()}...")
+        
+        # Get training files with full paths
+        train_files_rel = splits_dict['train']
+        train_files_full = [input_dir / Path(f) for f in train_files_rel]
+        
+        if not train_files_full:
+            logging.warning(f"No training files for {sat}, skipping...")
+            continue
+        
+        # Compute mean and std with band names
+        mean_dict, std_dict, band_names = compute_mean_std_with_bands(
+            train_files_full, n_workers
+        )
+        
+        if not band_names:
+            logging.warning(f"No bands found for {sat}, skipping...")
+            continue
+        
+        # Store in nested structure with band names as keys
+        norm_data[sat] = {
+            'mean': mean_dict,
+            'std': std_dict
+        }
+        
+        logging.info(f"  {sat.upper()}: {len(band_names)} bands/channels")
+        logging.info(f"    Bands: {', '.join(band_names)}")
+    
+    # Save to file
+    output_file = output_dir / "norm.json"
+    with open(output_file, 'w') as f:
+        json.dump(norm_data, f, indent=2)
+    
+    logging.info(f"Global norm.json saved to {output_file}")
+    
+    # Log summary
+    for sat, data in norm_data.items():
+        logging.info(f"  {sat.upper()}: {len(data['mean'])} bands")
+
+
 @hydra.main(config_path="../../configs", config_name="config.yaml", version_base="1.3.2")
 def main(cfg: DictConfig):
 
@@ -1022,29 +1255,43 @@ def main(cfg: DictConfig):
             json.dump(splits_dict_rel, f, indent=2)
         logging.info(f"Splits saved to {data_paths_file}")
 
-        # Compute normalization on training set
+        # Compute normalization on training set with band names
         train_files_full = [input_dir / Path(f) for f in splits_dict_rel["train"]]
-        
         if train_files_full:
-            mean, std = compute_mean_std(train_files_full, n_workers=n_workers)
-            logging.info(f"Mean: {mean.numpy()}")
-            logging.info(f"Std: {std.numpy()}")
+            mean_dict, std_dict, band_names = compute_mean_std_with_bands(
+                train_files_full, n_workers=n_workers
+            )
+            
+            if band_names:
+                logging.info(f"Computed normalization for {len(band_names)} bands:")
+                for band in band_names:
+                    logging.info(f"  {band}: mean={mean_dict[band]:.4f}, std={std_dict[band]:.4f}")
 
-            mean_std_file = sat_output_dir / "norm_data.json"
-            with open(mean_std_file, "w") as f:
-                json.dump(
-                    {"mean": mean.tolist(), "std": std.tolist()}, 
-                    f, 
-                    indent=2
-                )
-            logging.info(f"Normalization saved to {mean_std_file}")
+                mean_std_file = sat_output_dir / "norm_data.json"
+                with open(mean_std_file, "w") as f:
+                    json.dump({"mean": mean_dict, "std": std_dict}, f, indent=2)
+                logging.info(f"Normalization saved to {mean_std_file}")
+            else:
+                logging.warning(f"No bands found for {satellite}, skipping normalization")
+
+    if align_modalities and len(satellite_files) > 1:
+        logging.info(f"[STEP 6.5] Creating global splits.json and norm.json...")
+        
+        # Create global splits.json
+        create_global_splits_json(satellite_splits, satellite_files, input_dir, output_dir)
+        
+        satellite_splits_rel = {}
+        for sat, splits_dict in satellite_splits.items():
+            satellite_splits_rel[sat] = {k: to_rel(input_dir, v) for k, v in splits_dict.items()}
+        
+        create_global_norm_json(satellite_splits_rel, input_dir, output_dir, n_workers)
 
     # Save configuration
     config_file = output_dir / "config.json"
     with open(config_file, "w") as f:
         json.dump(OmegaConf.to_container(cfg_split, resolve=True), f, indent=2)
     logging.info(f"  Configuration saved to {config_file}")
-    
+
     # =========================================================================
     # STEP 7: Create and save GeoDataFrame
     # =========================================================================
@@ -1067,7 +1314,7 @@ def main(cfg: DictConfig):
                         single_sat_splits = {sat: satellite_splits[sat]}
                         single_sat_files = {sat: satellite_files[sat]}
 
-                        gdf = create_splits_geodataframe(single_sat_splits, single_sat_files)
+                        gdf = create_splits_geodataframe(single_sat_splits, single_sat_files, n_workers)
                         if gdf is not None:
                             base_name = f"patch_locations_{sat}"
                             save_geodataframe(gdf, output_dir, base_name=base_name)
