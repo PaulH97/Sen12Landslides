@@ -195,7 +195,7 @@ _Note: _Note: This guidance differs from the macro-averaged metrics used in our 
 ## Performance Baselines & Dataset Challenges
 
 ### Baseline Results
-Coming soon: Updated benchmark table with the binary metrics on the `S12LS-LD`.
+Coming soon: Updated benchmark table with the extended metrics on the `S12LS-LD`.
 
 ### Why Landslide Detection is Challenging in Sen12Landslides
 
@@ -213,4 +213,4 @@ These **challenges** make Sen12Landslides an excellent benchmark for:
 - Small object detection in remote sensing
 - Transfer learning and domain adaptation approaches
 
-The low baseline performance on the landslide class reflects the genuine difficulty of this real-world problem and presents **significant opportunity for methodological innovation**. We encourage researchers to tackle these challenges and contribute improved methods.
+A low baseline performance on the landslide class reflects the genuine difficulty of this real-world problem and presents **significant opportunity for methodological innovation**. We encourage researchers to tackle these challenges and contribute improved methods.
