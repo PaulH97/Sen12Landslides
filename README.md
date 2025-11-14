@@ -186,13 +186,31 @@ Output includes `data_paths.json` (file lists), `norm_data.json` (statistics), a
 
 
 ## Evaluation Metrics
-Sen12Landslides is characterized by severe class imbalance (~2% landslides). For a meaningful evaluation, we strongly recommend using metrics that focus on the positive (landslide) class:
-- Average Precision (AP)
-- Area Under the ROC Curve (AUROC)
-- F1-Score, Precision, and Recall for the landslide class
+Sen12Landslides is characterized by severe class imbalance (~2% landslides). For a meaningful evaluation, we strongly recommend using metrics that focus on the positive (landslide) class.
 
-_Note: This guidance differs from the macro-averaged metrics used in our paper. While macro-averaging was suitable for our paper's broad technical validation, the metrics recommended here provide a more direct and practical assessment of a model's ability to detect the rare landslide class._
+_Note: _Note: This guidance differs from the macro-averaged metrics used in our paper. While macro-averaging was suitable for our paper's broad technical validation, we now recognize that for practical landslide detection applications, metrics focusing on the positive class provide more actionable insights. Users comparing their results to our published paper should be aware of this distinction.__
 
----
 
-**Coming soon:** Updated benchmark table with the recommended extensive metrics on the `S12LS-LD` for better benchmarking and comparison.
+
+## Performance Baselines & Dataset Challenges
+
+### Baseline Results
+Coming soon: Updated benchmark table with the binary metrics on the `S12LS-LD`.
+
+### Why Landslide Detection is Challenging in Sen12Landslides
+
+This dataset presents several characteristics that make it a **demanding benchmark** for landslide detection methods:
+
+1. **Severe class imbalance** (~2% landslides) - requires methods robust to imbalanced learning
+2. **Small spatial extent** - Many landslides span only a few pixels at 10m resolution
+3. **Multi-temporal complexity** - Leveraging temporal information effectively remains an open challenge
+4. **Multi-modal fusion** - Optimal integration of Sentinel-1 (SAR) and Sentinel-2 (optical) is non-trivial
+5. **Geographic diversity** - Landslides occur across varied terrain, vegetation, and climate conditions
+
+These **challenges** make Sen12Landslides an excellent benchmark for:
+- Novel architectures for imbalanced, multi-modal learning
+- Temporal fusion strategies
+- Small object detection in remote sensing
+- Transfer learning and domain adaptation approaches
+
+The low baseline performance on the landslide class reflects the genuine difficulty of this real-world problem and presents **significant opportunity for methodological innovation**. We encourage researchers to tackle these challenges and contribute improved methods.
