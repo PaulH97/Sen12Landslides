@@ -186,9 +186,9 @@ Output includes `data_paths.json` (file lists), `norm_data.json` (statistics), a
 
 
 ## Evaluation Metrics
-Sen12Landslides is characterized by severe class imbalance (~2% landslides). For a meaningful evaluation, we strongly recommend using metrics that focus on the positive (landslide) class.
+Sen12Landslides is characterized by severe class imbalance (~3% landslides). For a meaningful evaluation, we strongly recommend using metrics that focus on the positive (landslide) class.
 
-_Note: _Note: This guidance differs from the macro-averaged metrics used in our paper. While macro-averaging was suitable for our paper's broad technical validation, we now recognize that for practical landslide detection applications, metrics focusing on the positive class provide more actionable insights. Users comparing their results to our published paper should be aware of this distinction.__
+_Note: _Note: This guidance differs from the macro-averaged metrics used in our paper. While macro-averaging was suitable for our paper's broad technical validation, we want to clarify that for practical landslide detection applications, metrics focusing on the positive class provide more actionable insights. Users comparing their results to our published paper should be aware of this distinction.__
 
 
 
@@ -201,7 +201,7 @@ Coming soon: Updated benchmark table with the extended metrics on the `S12LS-LD`
 
 This dataset presents several characteristics that make it a **demanding benchmark** for landslide detection methods:
 
-1. **Severe class imbalance** (~2% landslides) - requires methods robust to imbalanced learning
+1. **Severe class imbalance** (~3% landslides) - requires methods robust to imbalanced learning
 2. **Small spatial extent** - Many landslides span only a few pixels at 10m resolution
 3. **Multi-temporal complexity** - Leveraging temporal information effectively remains an open challenge
 4. **Multi-modal fusion** - Optimal integration of Sentinel-1 (SAR) and Sentinel-2 (optical) is non-trivial
