@@ -191,11 +191,12 @@ Sen12Landslides is characterized by severe class imbalance (~3% landslides). For
 _Note: _Note: This guidance differs from the macro-averaged metrics used in our paper. While macro-averaging was suitable for our paper's broad technical validation, we want to clarify that for practical landslide detection applications, metrics focusing on the positive class provide more actionable insights. Users comparing their results to our published paper should be aware of this distinction.__
 
 
-
 ## Performance Baselines & Dataset Challenges
 
 ### Baseline Results
-Coming soon: Updated benchmark table with the extended metrics on the `S12LS-LD`.
+Please use the provided `S12LS-LD` splits for landslide detection tasks and the `S12LS-AD` for anomaly detection tasks.
+Updated `S12LS-LD` with better geographical split and higher quality is in lrogress and uploaded tomorrow.
+Coming soon: Updated benchmark table with the extended metrics on the new `S12LS-LD`.
 
 ### Why Landslide Detection is Challenging in Sen12Landslides
 
