@@ -33,14 +33,15 @@ seed: 42
 
 split_settings:
   input_dir: ${base_dir}/data_local/final
-  output_dir: ${base_dir}/tasks/S12LS-AD
+  output_dir: ${base_dir}/tasks/S12LS-LD_test
   export_geodataframe: true # Export GeoDataFrame of splits
-  align_modalities: false  # Ensure all modalities are aligned
+  align_modalities: true  # Ensure all modalities are aligned
   filter_criteria:
-    include_patterns: []
-    exclude_patterns: []  # e.g., ["newzealand", "kyrgyzstan1"]
+    min_annotated_pixel: 5 # Minimum annotated pixels to include a sample
+    include_patterns: [] # Used to only include files from these inventories e.g., ["italy", "hiroshima"]
+    exclude_patterns: []  # Used to exclude all files from these inventories e.g., ["newzealand", "kyrgyzstan1"]
     satellites: ["s1asc", "s1dsc", "s2"]  # e.g., ["s1asc", "s1dsc", "s2"]
-    annotated_only: false        # Keep only annotated files
+    annotated_only: true        # Keep only annotated files
     non_annotated_only: false   # Keep only non-annotated files
     annotated_ratio: null       # If mixing both, ratio of annotated (0.0-1.0)
     min_confidence: null  # e.g., 0.7 to keep only patches with high-confidence dates

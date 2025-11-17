@@ -165,7 +165,8 @@ def check_file_metadata(file_path, criteria):
         Path to satellite image file
     criteria : object
         Filtering criteria with attributes: exclude_patterns, include_patterns,
-        satellites, annotated_only, non_annotated_only, min_confidence, max_confidence
+        satellites, annotated_only, non_annotated_only, min_confidence, max_confidence,
+        min_annotated_pixel
         
     Returns
     -------
@@ -243,6 +244,24 @@ def check_file_metadata(file_path, criteria):
             ):
                 return False, metadata
 
+            # Check minimum annotated pixels
+            if criteria.min_annotated_pixel is not None:
+                if "MASK" in ds.data_vars:
+                    mask = ds["MASK"].values
+                    # Handle different time dimensions
+                    if mask.ndim == 3:  # (time, H, W)
+                        mask = mask[0]  # Take first timestep
+                    annotated_pixel_count = int(np.sum(mask == 1))
+                    metadata["annotated_pixel_count"] = annotated_pixel_count
+                    
+                    if annotated_pixel_count < criteria.min_annotated_pixel:
+                        return False, metadata
+                else:
+                    # No MASK variable, treat as 0 annotated pixels
+                    metadata["annotated_pixel_count"] = 0
+                    if criteria.min_annotated_pixel > 0:
+                        return False, metadata
+
             return True, metadata
 
     except Exception as e:
@@ -283,6 +302,10 @@ def filter_files(files, criteria, n_workers=4, seed=42):
             filtered_files.append(file_path)
             metadata_dict[str(file_path)] = metadata
 
+    # Log filtering summary
+    if criteria.min_annotated_pixel is not None:
+        logging.info(f"Applied min_annotated_pixel filter: {criteria.min_annotated_pixel} pixels")
+
     # Only apply ratio adjustment if we want a MIX of both types
     should_adjust_ratio = (
         criteria.annotated_ratio is not None and
@@ -292,16 +315,10 @@ def filter_files(files, criteria, n_workers=4, seed=42):
     )
 
     if should_adjust_ratio:
-        annotated_files = [
-            f for f in filtered_files if metadata_dict[str(f)]["annotated"] == "True"
-        ]
-        non_annotated_files = [
-            f for f in filtered_files if metadata_dict[str(f)]["annotated"] == "False"
-        ]
+        annotated_files = [f for f in filtered_files if metadata_dict[str(f)]["annotated"] == "True"]
+        non_annotated_files = [f for f in filtered_files if metadata_dict[str(f)]["annotated"] == "False"]
 
-        logging.info(
-            f"Before ratio adjustment: {len(annotated_files)} annotated, {len(non_annotated_files)} non-annotated"
-        )
+        logging.info(f"Before ratio adjustment: {len(annotated_files)} annotated, {len(non_annotated_files)} non-annotated")
 
         # Only proceed if we have BOTH types
         if len(annotated_files) > 0 and len(non_annotated_files) > 0:
@@ -319,14 +336,10 @@ def filter_files(files, criteria, n_workers=4, seed=42):
                 ).tolist()
 
             if len(non_annotated_files) > non_annotated_desired:
-                non_annotated_files = np.random.choice(
-                    non_annotated_files, non_annotated_desired, replace=False
-                ).tolist()
+                non_annotated_files = np.random.choice(non_annotated_files, non_annotated_desired, replace=False).tolist()
 
             filtered_files = annotated_files + non_annotated_files
-            logging.info(
-                f"After ratio adjustment: {len(annotated_files)} annotated, {len(non_annotated_files)} non-annotated"
-            )
+            logging.info(f"After ratio adjustment: {len(annotated_files)} annotated, {len(non_annotated_files)} non-annotated")
         else:
             logging.warning(
                 f"Cannot apply annotated_ratio={criteria.annotated_ratio}: "
