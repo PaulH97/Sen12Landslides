@@ -35,12 +35,12 @@ split_settings:
   input_dir: ${base_dir}/data_local/final
   output_dir: ${base_dir}/tasks/S12LS-LD_test
   export_geodataframe: true # Export GeoDataFrame of splits
-  align_modalities: true  # Ensure all modalities are aligned
+  clip_data: true   # Clip data: s2 [0-10000], s1 [-50,10], dem [0-8800]
   filter_criteria:
     min_annotated_pixel: 5 # Minimum annotated pixels to include a sample
     include_patterns: [] # Used to only include files from these inventories e.g., ["italy", "hiroshima"]
-    exclude_patterns: []  # Used to exclude all files from these inventories e.g., ["newzealand", "kyrgyzstan1"]
-    satellites: ["s1asc", "s1dsc", "s2"]  # e.g., ["s1asc", "s1dsc", "s2"]
+    exclude_patterns: ["nepal"]  # Used to exclude all files from these inventories e.g., ["newzealand", "kyrgyzstan1"]
+    satellites: ["s1asc", "s1dsc", "s2"]  # e.g., ["s1asc", "s1dsc", "s2"] 
     annotated_only: true        # Keep only annotated files
     non_annotated_only: false   # Keep only non-annotated files
     annotated_ratio: null       # If mixing both, ratio of annotated (0.0-1.0)
