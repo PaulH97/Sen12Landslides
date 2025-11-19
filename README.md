@@ -100,7 +100,11 @@ NetCDF files (`.nc`) with 128×128 pixel patches across 15 time steps:
 
 
 ### Task Configurations (`tasks/`)
-Pre-configured splits for anomaly detection (`S12LS-AD/`) and landslide detection (`S12LS-LD/`).
+
+Some patches are challenging even for human experts (e.g., <10 annotated pixels, ambiguous temporal signatures, missing/noisy labels). We provide two task-specific configurations:
+
+- **S12LS-LD**: Landslide detection with ~3,500-4,000 high-quality annotated patches (manual verification)
+- **S12LS-AD**: Anomaly detection with mixed annotated/non-annotated samples to learn normal vs. anomalous patterns
 
 #### Always Generated (Root Level)
 | File | Description |
