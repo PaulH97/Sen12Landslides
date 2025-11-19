@@ -97,6 +97,13 @@ def check_file_metadata(file_path, criteria):
     """Check if file meets filtering criteria."""
     filename = file_path.name.lower()
 
+    if criteria.low_quality_patches_file:
+        with open(criteria.low_quality_patches_file, 'r') as f:
+            low_quality_patches = set(line.strip().lower() for line in f)
+        patch_id = file_key(file_path)  # Extract patch ID without satellite suffix
+        if patch_id in low_quality_patches:
+            return False, None
+
     # Check patterns
     if any(p.lower() in filename for p in criteria.exclude_patterns):
         return False, None
