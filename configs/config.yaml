@@ -33,19 +33,20 @@ seed: 42
 
 split_settings:
   input_dir: ${base_dir}/data_local/final
-  output_dir: ${base_dir}/tasks/S12LS-LD_test
+  output_dir: ${base_dir}/tasks/S12LS-LD
   export_geodataframe: true # Export GeoDataFrame of splits
   clip_data: true   # Clip data: s2 [0-10000], s1 [-50,10], dem [0-8800]
   filter_criteria:
-    min_annotated_pixel: 5 # Minimum annotated pixels to include a sample
+    min_annotated_pixel: 10 # Minimum annotated pixels to include a sample
     include_patterns: [] # Used to only include files from these inventories e.g., ["italy", "hiroshima"]
-    exclude_patterns: ["nepal"]  # Used to exclude all files from these inventories e.g., ["newzealand", "kyrgyzstan1"]
+    exclude_patterns: ["usa_alaska", "nepal"]  # Used to exclude all files from these inventories e.g., ["newzealand", "kyrgyzstan1"]
     satellites: ["s1asc", "s1dsc", "s2"]  # e.g., ["s1asc", "s1dsc", "s2"] 
     annotated_only: true        # Keep only annotated files
     non_annotated_only: false   # Keep only non-annotated files
     annotated_ratio: null       # If mixing both, ratio of annotated (0.0-1.0)
     min_confidence: null  # e.g., 0.7 to keep only patches with high-confidence dates
     max_confidence: null  # e.g., 0.5 to keep only patches with low-confidence dates
+    low_quality_patches_file: ${base_dir}/tests/low_quality_patches.txt
   test_size: 0.2   # 20% for testing
   val_size: 0.2    
   seed: 42
