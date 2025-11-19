@@ -61,7 +61,7 @@ Sen12Landslides/
 │   │   ├── config.json                        
 │   │   ├── norm_aligned.json                  
 │   │   ├── patch_locations_aligned.geojson    
-│   │   ├── splits.json                       
+│   │   ├── splits_aligned.json                       
 │   │   ├── s1asc/
 │   │   │   ├── norm_data.json                
 │   │   │   ├── patch_locations.geojson        
@@ -72,9 +72,9 @@ Sen12Landslides/
 │   │       └── ...         
 │   └── S12LS-LD/                              # Landslide detection task configuration
 │       ├── config.json
-│       ├── splits_aligned.json                
-│       ├── norm_aligned.json                  
-│       ├── patch_locations_aligned.geojson         
+│       ├── norm_aligned.json              
+│       ├── patch_locations_aligned.geojson            
+│       ├── splits_aligned.json            
 │       ├── s1asc/
 │       │   ├── norm.json
 │       │   ├── patch_locations.geojson
