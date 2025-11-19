@@ -49,7 +49,7 @@ Sen12Landslides/
 │   ├── ...
 │   ├── inventories.shp.zip
 │   ├── s1asc/
-│   │   ├── italy_s1asc_6982.nc             # <region>_<sensor>_<patch_id>.nc
+│   │   ├── italy_s1asc_6982.nc                # <region>_<sensor>_<patch_id>.nc
 │   │   ├── chimanimani_s1asc_1024.nc
 │   │   └── ...
 │   ├── s1dsc/
@@ -57,31 +57,33 @@ Sen12Landslides/
 │   └── s2/
 │       └── ...
 ├── tasks/
-│   ├── S12LS-AD/                           # Anomaly detection task configuration
-│   │   ├── config.json                     # Task-level metadata
-│   │   ├── patch_locations_s1asc.geojson   # Independent per modality
-│   │   ├── patch_locations_s1dsc.geojson   
-│   │   ├── patch_locations_s2.geojson       
+│   ├── S12LS-AD/                              # Anomaly detection task configuration
+│   │   ├── config.json                        
+│   │   ├── norm_aligned.json                  
+│   │   ├── patch_locations_aligned.geojson    
+│   │   ├── splits.json                       
 │   │   ├── s1asc/
-│   │   │   ├── data_paths.json
-│   │   │   └── norm_data.json             
+│   │   │   ├── norm_data.json                
+│   │   │   ├── patch_locations.geojson        
+│   │   │   └── splits.json                    
 │   │   ├── s1dsc/
 │   │   │   └── ...           
 │   │   └── s2/
 │   │       └── ...         
-│   └── S12LS-LD/                           # Landslide detection task configuration
+│   └── S12LS-LD/                              # Landslide detection task configuration
 │       ├── config.json
-│       ├── splits.json                     # Train/val/test splits with data paths
-│       ├── norm.json                       # Normalization values across modalities
-│       ├── patch_locations.geojson         # Aligned across all modalities
+│       ├── splits_aligned.json                
+│       ├── norm_aligned.json                  
+│       ├── patch_locations_aligned.geojson         
 │       ├── s1asc/
-│       │   ├── data_paths.json
-│       │   └── norm_data.json              
+│       │   ├── norm.json
+│       │   ├── patch_locations.geojson
+│       │   └── splits.json              
 │       ├── s1dsc/
 │       │   └── ...          
 │       └── s2/
 │           └── ...            
-├── src/                                    # data loaders, model definitions, ...
+├── src/                                       # data loaders, model definitions, ...
 ├── ...
 └── README.md
 ```
@@ -93,44 +95,45 @@ Zipped shapefile containing ground-truth landslide polygons. Each polygon repres
 
 **Satellite Image Patches** (`s1asc/`, `s1dsc/`, `s2/`)
 NetCDF files (`.nc`) with 128×128 pixel patches across 15 time steps:
-- **Sentinel-1**: 2 polarizations (VV, VH), DEM, landslide mask (MASK), and metadata
-- **Sentinel-2**: 10 spectral bands (B02–B08, B8A, B11–B12), Scene Classification Layer (SCL), DEM, landslide mask (MASK), and metadata
+- Sentinel-1: 2 polarizations (VV, VH), DEM, landslide mask (MASK), and metadata
+- Sentinel-2: 10 spectral bands (B02–B08, B8A, B11–B12), Scene Classification Layer (SCL), DEM, landslide mask (MASK), and metadata
+
 
 ### Task Configurations (`tasks/`)
-
 Pre-configured splits for anomaly detection (`S12LS-AD/`) and landslide detection (`S12LS-LD/`).
 
-#### Always Generated
+#### Always Generated (Root Level)
 | File | Description |
 |------|-------------|
 | `config.json` | Filter criteria, split ratios, and stratification settings |
-| `patch_locations.geojson` | Geographic patch locations with train/val/test assignments |
 
 #### Per-Satellite Folders (`s1asc/`, `s1dsc/`, `s2/`)
 | File | Description |
 |------|-------------|
-| `data_paths.json` | Train/val/test file paths (relative to data directory) |
-| `norm_data.json` | Per-band normalization statistics (mean/std) |
+| `splits.json` | Train/val/test splits for this satellite modality |
+| `norm.json` | Per-band normalization statistics (mean/std) for this satellite |
+| `patch_locations.geojson` | Geographic patch locations with train/val/test assignments for this satellite |
 
-#### Multi-Modal Files (when `align_modalities: true`)
+#### Multi-Modal Files
 | File | Description |
 |------|-------------|
-| `splits.json` | Unified splits with file paths for all satellites and annotated pixel counts |
-| `norm.json` | Combined normalization statistics across all modalities |
+| `splits_aligned.json` | Train/val/test splits containing only patches available across all satellites |
+| `norm_aligned.json` | Normalization statistics computed from aligned patches only |
+| `patch_locations_aligned.geojson` | Geographic locations of patches available across all satellites |
 
 **Usage:**
-- **Single-modal**: Load `<satellite>/data_paths.json` + `<satellite>/norm_data.json`
-- **Multi-modal**: Load `splits.json` + `norm.json` for cross-modal fusion
-- **Visualization**: Open `patch_locations.geojson` in QGIS or mapping tools
+- Single-modal: Load `<satellite>/data_paths.json` + `<satellite>/norm_data.json`
+- Multi-modal: Load `splits.json` + `norm.json` for cross-modal fusion
+- Visualization: Open `patch_locations.geojson` in QGIS or mapping tools
 
 ### Source Code (`src/`)
 
 Processing, training, and evaluation codebase:
-- **Dataset loaders** for NetCDF patches
-- **Model architectures** (CNNs, transformers, fusion networks)
-- **Training pipelines** with experiment tracking
-- **Evaluation scripts** for metrics and visualization
-- **Preprocessing utilities** for data augmentation and normalization
+- Dataset loaders for NetCDF patches
+- Model architectures (CNNs, transformers, fusion networks)
+- Training pipelines with experiment tracking
+- Evaluation scripts for metrics and visualization
+- Preprocessing utilities for data augmentation and normalization
 
 ## Data Record 
 
