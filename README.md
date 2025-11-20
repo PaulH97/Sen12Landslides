@@ -1,4 +1,4 @@
-# Sen12Landslides: Spatio-Temporal Landslide & Anomaly Dataset
+# Sen12Landslides: Spatio-Temporal Landslide & Anomaly Detection Dataset
 
 A large-scale, multi-modal, multi-temporal collection of 128×128px Sentinel-1/2 + DEM patches with 10m spatial resolution and with 75k landslide annotations.
 
@@ -8,11 +8,30 @@ https://www.nature.com/articles/s41597-025-06167-2
 **Dataset**: 
 🔗 [https://huggingface.co/datasets/paulhoehn/Sen12Landslides](https://huggingface.co/datasets/paulhoehn/Sen12Landslides)
 
-| Modality | Samples | Annotated  | Non-Annotated |
-|----------|:-------:|:----------:|:-------------:|
-| Sentinel-1-asc | 13306 | 6494 | 6812 |
-| Sentinel-1-dsc | 12622 |6349 | 6273 |
-| Sentinel-2 | 13628 | 6739 | 6889 |
+## Dataset Statistics
+
+### Sen12Landslides (Full Dataset)
+| Modality       | Samples | Annotated | Non-Annotated | Ann. Rate |
+|----------------|:-------:|:---------:|:-------------:|:---------:|
+| Sentinel-1-asc | 13,306  | 6,492     | 6,814         | 48.8%     |
+| Sentinel-1-dsc | 12,622  | 6,347     | 6,275         | 50.3%     |
+| Sentinel-2     | 13,628  | 6,737     | 6,891         | 49.4%     |
+
+### S12LS-AD (Anomaly Detection)
+| Modality       | Samples | Annotated | Non-Annotated | Ann. Rate |
+|----------------|:-------:|:---------:|:-------------:|:---------:|
+| Sentinel-1-asc | 13,306  | 6,492     | 6,814         | 48.8%     |
+| Sentinel-1-dsc | 12,622  | 6,347     | 6,275         | 50.3%     |
+| Sentinel-2     | 13,628  | 6,737     | 6,891         | 49.4%     |
+| **Aligned**    | **11,719** | **6,026** | **5,693**  | **51.4%** |
+
+### S12LS-LD (Landslide Detection)
+| Modality       | Samples | Annotated | Non-Annotated | Ann. Rate |
+|----------------|:-------:|:---------:|:-------------:|:---------:|
+| Sentinel-1-asc | 6,410   | 6,410     | 0             | 100%      |
+| Sentinel-1-dsc | 6,272   | 6,272     | 0             | 100%      |
+| Sentinel-2     | 6,653   | 6,653     | 0             | 100%      |
+| **Aligned**    | **5,953** | **5,953** | **0**       | **100%**  |
 
 
 ## Setup
