@@ -8,7 +8,12 @@ https://www.nature.com/articles/s41597-025-06167-2
 **Dataset**: 
 🔗 [https://huggingface.co/datasets/paulhoehn/Sen12Landslides](https://huggingface.co/datasets/paulhoehn/Sen12Landslides)
 
----
+| Modailty | Samples | Annotated  | Non-Annotated |
+|----------|:-------:|:----------:|:-------------:|
+| Sentinel-1-asc | 13306 | 6494 | 6812 |
+| Sentinel-1-dsc | 12622 |6349 | 6273 |
+| Sentinel-2 | 13628 | 6739 | 6889 |
+
 
 ## Setup
 
