@@ -46,9 +46,9 @@ Full Dataset
 Task Splits
 | Modality | S12LS-LD      | S12LS-AD        |
 |----------|:-------------:|:---------------:|
-| S1-asc   | 6,410 (100%)  | 13,306 (48.8%)  |
-| S1-dsc   | 6,272 (100%)  | 12,622 (50.3%)  |
-| S2       | 6,653 (100%)  | 13,628 (49.4%)  |
+| S1-asc   | 4,793 (100%)  | 13,306 (48.8%)  |
+| S1-dsc   | 4,666 (100%)  | 12,622 (50.3%)  |
+| S2       | 4,988 (100%)  | 13,628 (49.4%)  |
 
 </td>
 </tr>
@@ -157,39 +157,36 @@ python src/data/create_splits.py  # Configure in configs/splits/config.yaml
 
 This project uses [Hydra](https://hydra.cc/) for configuration management. See [Hydra documentation](https://hydra.cc/docs/intro/) for more details.
 
-### Config Structure
-```
-configs/
-├── config.yaml          # Main config
-├── model/               # Model architectures
-├── dataset/             # Dataset configurations  
-├── datamodule/          # DataLoader settings
-├── trainer/             # PyTorch Lightning trainer
-├── lit_module/          # PyTorch Lightning Module
-└── callbacks/           # Checkpointing, early stopping
-```
+### Available Configurations
+
+| Config | Options |
+|--------|---------|
+| `model` | `utae`, `convgru`, `unet3d`, `fpn_convlstm` |
+| `dataset` | `sen12ls_s2`, `sen12ls_s1asc`, `sen12ls_s1dsc` |
+| `trainer` | `cpu`, `gpu`, `ddp` |
+| `lit_module` | `binary`, `multiclass` |
+
 
 ### Examples
 ```bash
-# Train UTAE on Sentinel-2
-python src/pipeline/train.py model=utae dataset=sen12ls_s2
+# Train ConvGRU on Sentinel-2
+python src/pipeline/train.py model=convgru dataset=sen12ls_s2
 
-# Train ConvGRU on Sentinel-1 with DEM
-python src/pipeline/train.py model=convgru dataset=sen12ls_s1asc dataset.dem=true dataset.num_channels=3
+# Train UTAE on Sentinel-1 with DEM
+python src/pipeline/train.py model=utae dataset=sen12ls_s1asc dataset.dem=true dataset.num_channels=3
 
 # Multi-GPU training
 python src/pipeline/train.py trainer.devices=4 trainer.strategy=ddp dataset=sen12ls_s2
 
-# Multirun with S12LS-LD on three models
-python src/pipeline/train.py -m model=utae,convlstm,convgru dataset=sen12ls_s2 dataset.task=S12LS-LD lit_module=binary    
+# Multirun with three models
+python src/pipeline/train.py --multirun model=utae,convlstm,convgru dataset=sen12ls_s2     
 ```
 
 ## Baselines
 
-
 **Sen12Landslides** exhibits severe class imbalance, with landslide pixels constituting approximately **~3%** of the dataset. Consequently, standard metrics like Overall Accuracy (OA) are misleading (a model predicting "no landslide" everywhere would achieve ~97% OA). To ensure rigorous evaluation, we focus on metrics targeting the **positive class (Landslide)** rather than the background.
 
-> **Note:** While our accompanying paper reports *macro-averaged* metrics to assess overall semantic consistency, we provide **Binary Metrics** (Class 1: Landslide) below. We strongly recommend using binary metrics or AUROC/AP for practical comparisons with other works.
+> **Note:** While our accompanying paper reports *macro-averaged* metrics to assess overall semantic consistency, we provide **Binary Metrics** (Class 1: Landslide) below. We strongly recommend using these for practical comparisons with other works on landlside detection.
 
 ### Benchmark Results (`S12LS-LD`)
 
@@ -203,7 +200,7 @@ python src/pipeline/train.py -m model=utae,convlstm,convgru dataset=sen12ls_s2 d
 | U-TAE | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
 | **Your Method** |  **0.00** | **0.00** | **0.00** | **0.00** | **0.00** |  **0.00** |
 
-Use provided `S12LS-LD` splits for reproducible comparisons.
+Use provided `S12LS-LD` splits with hyperparameter from `configs/lit_module/binary` for reproducible comparisons.
 
 
 ## Open Challenges
