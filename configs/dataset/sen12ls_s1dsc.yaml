@@ -1,0 +1,12 @@
+# configs/dataset/sen12ls_s1dsc.yaml
+name: sen12ls_s1dsc
+root: /dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides
+task: S12LS-LD-HQ
+modality: s1dsc
+timeseries_len: 15
+img_size: 128
+num_classes: 1
+num_channels: 2 # or 3 if dem=true
+dem: false
+min_date: "2015-12-03"
+nodata_value: -9999.0
