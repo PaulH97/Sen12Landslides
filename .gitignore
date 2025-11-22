@@ -1,5 +1,6 @@
 # Ignore all files in the data folder
 data/
+data_zipped/
 data_local/
 !src/data/
 src/scripts/
