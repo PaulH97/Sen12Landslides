@@ -1,0 +1,10 @@
+_target_: lightning.pytorch.trainer.Trainer
+default_root_dir: ${exp_dir}
+max_epochs: 30
+accelerator: gpu
+devices: 1
+precision: 16-mixed
+gradient_clip_val: 1.0
+logger: ${logger}
+callbacks: ${callbacks}
+fast_dev_run: False

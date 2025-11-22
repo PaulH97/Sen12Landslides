@@ -1,61 +1,33 @@
+# configs/config.yaml
 defaults:
   - _self_
-  - model: unet_convlstm
-  - dataset: s2
-  - callback: model_checkpoint 
+  - dataset: sen12ls_s2
+  - datamodule: sen12ls
+  - model: unet3d
+  - module: segmentation_bn
+  - trainer: cpu
   - logger: wandb 
+  - callbacks: default
 
-experiment:
-  name: exp2
-  variant: dem
+# Timestamp for unique run dirs, e.g. 2025-09-19_19-42-07
+run_id: ${now:%Y-%m-%d_%H-%M-%S}
+exp_tag: "s12ls-ld"
+exp_name: ${model.name}_${dataset.name}_${exp_tag}_${run_id}
+root_dir: /Sen12Landslides
+exp_dir: ${root_dir}/outputs/models/${exp_name}
 
-base_dir: "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides"
-exp_dir: ${base_dir}/experiments/${experiment.name}/${experiment.variant}/${dataset.name}
-output_dir: ${base_dir}/outputs/${experiment.name}/${experiment.variant}/${dataset.name}/${model.name}
-
-# only for training 
-trainer: 
-  accelerator: gpu
-  strategy: ddp
-  devices: 1
-  precision: 16-mixed
-  max_epochs: 50
-  fast_dev_run: false
-  default_root_dir: ${output_dir}
-  gradient_clip_val: 1.0
-
-dataset:
-  batch_size: 24
-  
 sanity_check: false
 
 seed: 42
 
-split_settings:
-  input_dir: ${base_dir}/data_local/final
-  output_dir: ${base_dir}/tasks/S12LS-LD
-  export_geodataframe: true # Export GeoDataFrame of splits
-  clip_data: true   # Clip data: s2 [0-10000], s1 [-50,10], dem [0-8800]
-  filter_criteria:
-    min_annotated_pixel: 10 # Minimum annotated pixels to include a sample
-    include_patterns: [] # Used to only include files from these inventories e.g., ["italy", "hiroshima"]
-    exclude_patterns: ["usa_alaska", "nepal"]  # Used to exclude all files from these inventories e.g., ["newzealand", "kyrgyzstan1"]
-    satellites: ["s1asc", "s1dsc", "s2"]  # e.g., ["s1asc", "s1dsc", "s2"] 
-    annotated_only: true        # Keep only annotated files
-    non_annotated_only: false   # Keep only non-annotated files
-    annotated_ratio: null       # If mixing both, ratio of annotated (0.0-1.0)
-    min_confidence: null  # e.g., 0.7 to keep only patches with high-confidence dates
-    max_confidence: null  # e.g., 0.5 to keep only patches with low-confidence dates
-    low_quality_patches_file: ${base_dir}/tests/low_quality_patches.txt
-  test_size: 0.2   # 20% for testing
-  val_size: 0.2    
-  seed: 42
-  n_workers: 20
-
 hydra:
   run:
-    dir: ${output_dir}
+    dir: ${exp_dir}                                 
   sweep:
-    dir: ${base_dir}/outputs
-    subdir: ${experiment.name}/${experiment.variant}/${dataset.name}/${model.name}
+    dir: ${root_dir}/outputs/models/multiruns/${model.name}_${dataset.name}  
+    subdir: ${exp_name}       
+  job:
+    chdir: True
 
+ckpt_path: null  # Path to a checkpoint for prediction/testing
+preds_dir: null  # Directory to save predictions when running pipeline/predict.py

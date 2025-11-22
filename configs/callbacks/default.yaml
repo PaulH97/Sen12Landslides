@@ -1,0 +1,13 @@
+- _target_: lightning.pytorch.callbacks.ModelCheckpoint
+  dirpath: ${exp_dir}/checkpoints  
+  filename: "best_model-{val/IoU:.4f}"
+  monitor: "val/IoU"
+  save_top_k: 1
+  mode: "max"
+
+- _target_: lightning.pytorch.callbacks.EarlyStopping
+  monitor: "val/loss"
+  patience: 15
+  min_delta: 1e-3
+  mode: "min"
+  verbose: True
