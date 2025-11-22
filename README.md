@@ -44,11 +44,11 @@ Full Dataset
 <td>
 
 Task Splits
- S12LS-LD | S12LS-AD |
-:-------------:|:------------------:|
- 6,410 (100%)  | 13,306 (48.8%)     |
- 6,272 (100%)  | 12,622 (50.3%)     |
- 6,653 (100%)  | 13,628 (49.4%)     |
+| Modality | S12LS-LD      | S12LS-AD        |
+|----------|:-------------:|:---------------:|
+| S1-asc   | 6,410 (100%)  | 13,306 (48.8%)  |
+| S1-dsc   | 6,272 (100%)  | 12,622 (50.3%)  |
+| S2       | 6,653 (100%)  | 13,628 (49.4%)  |
 
 </td>
 </tr>
@@ -152,14 +152,61 @@ python src/data/create_splits.py  # Configure in configs/splits/config.yaml
 - Multi-modal training: Load `splits_aligned.json` + `norm_aligned.json` for cross-modal fusion
 - Visualization: Open `patch_locations.geojson` in QGIS or mapping tools
 
-## Evaluation
 
-Sen12Landslides has severe class imbalance (~3% landslides). Use metrics focusing on the positive class:
+## Training
 
-> **Note:** Our paper reports macro-averaged metrics. Binary metrics (below) are provided for practical comparison.
+This project uses [Hydra](https://hydra.cc/) for configuration management. See [Hydra documentation](https://hydra.cc/docs/intro/) for more details.
+
+### Config Structure
+```
+configs/
+├── config.yaml          # Main config
+├── model/               # Model architectures
+├── dataset/             # Dataset configurations  
+├── datamodule/          # DataLoader settings
+├── trainer/             # PyTorch Lightning trainer
+├── lit_module/          # PyTorch Lightning Module
+└── callbacks/           # Checkpointing, early stopping
+```
+
+### Examples
+```bash
+# Train UTAE on Sentinel-2
+python src/pipeline/train.py model=utae dataset=sen12ls_s2
+
+# Train ConvGRU on Sentinel-1 with DEM
+python src/pipeline/train.py model=convgru dataset=sen12ls_s1asc dataset.dem=true dataset.num_channels=3
+
+# Multi-GPU training
+python src/pipeline/train.py trainer.devices=4 trainer.strategy=ddp dataset=sen12ls_s2
+
+# Multirun with S12LS-LD on three models
+python src/pipeline/train.py -m model=utae,convlstm,convgru dataset=sen12ls_s2 dataset.task=S12LS-LD lit_module=binary    
+```
+
+## Baselines
 
 
-## Challenges
+**Sen12Landslides** exhibits severe class imbalance, with landslide pixels constituting approximately **~3%** of the dataset. Consequently, standard metrics like Overall Accuracy (OA) are misleading (a model predicting "no landslide" everywhere would achieve ~97% OA). To ensure rigorous evaluation, we focus on metrics targeting the **positive class (Landslide)** rather than the background.
+
+> **Note:** While our accompanying paper reports *macro-averaged* metrics to assess overall semantic consistency, we provide **Binary Metrics** (Class 1: Landslide) below. We strongly recommend using binary metrics or AUROC/AP for practical comparisons with other works.
+
+### Benchmark Results (`S12LS-LD`)
+
+**Coming soon**: An updated benchmark table utilizing the architectures described in the paper with **binary metrics**:
+
+| Model | Precision | Recall | F1-Score | IoU | AP | AUROC |
+| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
+| ConvGRU |  *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
+| U-ConvLSTM |  *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
+| Unet3D | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
+| U-TAE | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
+| **Your Method** |  **0.00** | **0.00** | **0.00** | **0.00** | **0.00** |  **0.00** |
+
+Use provided `S12LS-LD` splits for reproducible comparisons.
+
+
+## Open Challenges
 
 What makes this dataset demanding:
 
@@ -167,10 +214,3 @@ What makes this dataset demanding:
 2. **Small spatial extent** - landslides often span few pixels at 10m resolution
 3. **Multi-temporal complexity** - effective temporal fusion remains challenging
 4. **Geographic diversity** - varied terrain, vegetation, and climate
-
-
-## Baselines
-
-**Coming soon**: Updated benchmark table on `S12LS-LD` with binary metrics.
-
-Use provided task splits for reproducible comparisons.
