@@ -2,171 +2,91 @@
 
 A large-scale, multi-modal, multi-temporal collection of 128×128px Sentinel-1/2 + DEM patches with 10m spatial resolution and with 75k landslide annotations.
 
-**Paper**:
-https://www.nature.com/articles/s41597-025-06167-2
+**Paper**: https://www.nature.com/articles/s41597-025-06167-2
 
-**Dataset**: 
-🔗 [https://huggingface.co/datasets/paulhoehn/Sen12Landslides](https://huggingface.co/datasets/paulhoehn/Sen12Landslides)
-
-## Dataset Statistics
-
-### Sen12Landslides (Full Dataset)
-| Modality       | Samples | Annotated | Non-Annotated | Ann. Rate |
-|----------------|:-------:|:---------:|:-------------:|:---------:|
-| Sentinel-1-asc | 13,306  | 6,492     | 6,814         | 48.8%     |
-| Sentinel-1-dsc | 12,622  | 6,347     | 6,275         | 50.3%     |
-| Sentinel-2     | 13,628  | 6,737     | 6,891         | 49.4%     |
-
-### S12LS-AD (Anomaly Detection)
-| Modality       | Samples | Annotated | Non-Annotated | Ann. Rate |
-|----------------|:-------:|:---------:|:-------------:|:---------:|
-| Sentinel-1-asc | 13,306  | 6,492     | 6,814         | 48.8%     |
-| Sentinel-1-dsc | 12,622  | 6,347     | 6,275         | 50.3%     |
-| Sentinel-2     | 13,628  | 6,737     | 6,891         | 49.4%     |
-| **Aligned**    | **11,719** | **6,026** | **5,693**  | **51.4%** |
-
-### S12LS-LD (Landslide Detection)
-| Modality       | Samples | Annotated | Non-Annotated | Ann. Rate |
-|----------------|:-------:|:---------:|:-------------:|:---------:|
-| Sentinel-1-asc | 6,410   | 6,410     | 0             | 100%      |
-| Sentinel-1-dsc | 6,272   | 6,272     | 0             | 100%      |
-| Sentinel-2     | 6,653   | 6,653     | 0             | 100%      |
-| **Aligned**    | **5,953** | **5,953** | **0**       | **100%**  |
+**Dataset**: https://huggingface.co/datasets/paulhoehn/Sen12Landslides
 
 
-## Setup
-
+## Quick Start
 ```bash
-# 1. Clone code repo
+# Clone & setup
 git clone https://github.com/PaulH97/Sen12Landslides.git
 cd Sen12Landslides
-
-# 2. Install HF CLI
 pip install --upgrade huggingface_hub
 
-# 3. Authenticate (only first time)
-huggingface-cli login  # paste your token from https://huggingface.co/settings/tokens
-
-# 4. Pull the dataset into `data/`
+# Download dataset
+huggingface-cli login # paste your token from https://huggingface.co/settings/tokens (only once)
 mkdir data
 huggingface-cli download paulhoehn/Sen12Landslides --repo-type dataset --local-dir data
-```
 
-Unpack all `.nc` patches so the custom loader can read them directly:
-
-```bash
-# From repo root:
+# Extract patches
 for sensor in s1asc s1dsc s2; do
   for archive in data/$sensor/*.tar.gz; do
-    tar -xzvf "$archive" -C "data/$sensor" && rm "$archive" # remove compressed tar files after extraction 
+    tar -xzvf "$archive" -C "data/$sensor" && rm "$archive"
   done
 done
 ```
 
----
+## Dataset Overview
 
-## Data Structure
+<table>
+<tr>
+<td>
 
+Full Dataset
+| Modality | Samples | Annotated | Ann. Rate |
+|----------|:-------:|:---------:|:---------:|
+| S1-asc   | 13,306  | 6,492     | 48.8%     |
+| S1-dsc   | 12,622  | 6,347     | 50.3%     |
+| S2       | 13,628  | 6,737     | 49.4%     |
+
+</td>
+<td>
+
+Task Splits
+ S12LS-LD | S12LS-AD |
+:-------------:|:------------------:|
+ 6,410 (100%)  | 13,306 (48.8%)     |
+ 6,272 (100%)  | 12,622 (50.3%)     |
+ 6,653 (100%)  | 13,628 (49.4%)     |
+
+</td>
+</tr>
+</table>
+
+- S12LS-LD: Landslide detection with annotated patches 
+- S12LS-AD: Anomaly detection with mixed annotated/non-annotated samples to learn normal vs. anomalous patterns
+- See `Sen12Landslides/tasks/<task>/config.json` for split details
+
+### Data Structure
 ```
 Sen12Landslides/
 ├── data/
-│   ├── ...
-│   ├── inventories.shp.zip
-│   ├── s1asc/
-│   │   ├── italy_s1asc_6982.nc                # <region>_<sensor>_<patch_id>.nc
-│   │   ├── chimanimani_s1asc_1024.nc
-│   │   └── ...
-│   ├── s1dsc/
-│   │   └── ...
-│   └── s2/
-│       └── ...
+│   ├── inventories.shp.zip              # Ground-truth landslide polygons
+│   ├── s1asc/                           # Sentinel-1 Ascending patches
+│   │   └── <region>_s1asc_<id>.nc
+│   ├── s1dsc/                           # Sentinel-1 Descending patches
+│   └── s2/                              # Sentinel-2 patches
 ├── tasks/
-│   ├── S12LS-AD/                              # Anomaly detection task configuration
-│   │   ├── config.json                        
-│   │   ├── norm_aligned.json                  
-│   │   ├── patch_locations_aligned.geojson    
-│   │   ├── splits_aligned.json                       
-│   │   ├── s1asc/
-│   │   │   ├── norm_data.json                
-│   │   │   ├── patch_locations.geojson        
-│   │   │   └── splits.json                    
-│   │   ├── s1dsc/
-│   │   │   └── ...           
-│   │   └── s2/
-│   │       └── ...         
-│   └── S12LS-LD/                              # Landslide detection task configuration
-│       ├── config.json
-│       ├── norm_aligned.json              
-│       ├── patch_locations_aligned.geojson            
-│       ├── splits_aligned.json            
-│       ├── s1asc/
-│       │   ├── norm.json
-│       │   ├── patch_locations.geojson
-│       │   └── splits.json              
-│       ├── s1dsc/
-│       │   └── ...          
-│       └── s2/
-│           └── ...            
-├── src/                                       # data loaders, model definitions, ...
-├── ...
-└── README.md
+│   ├── S12LS-LD/                        # Landslide detection task
+│   │   ├── config.json
+│   │   └── <modality>/
+│   │       ├── splits.json              # Train/val/test file lists
+│   │       ├── norm.json                # Per-band mean/std
+│   │       └── patch_locations.geojson
+│   └── S12LS-AD/                        # Anomaly detection task
+│       └── ...
+└── src/                                 # Data loaders, models, training
 ```
 
-### Core Data Files (`data/`)
+### Patch Format
 
-**`inventories.shp.zip`**:
-Zipped shapefile containing ground-truth landslide polygons. Each polygon represents one mapped landslide event, spatially aligned with image patches.
+Each `.nc` file contains 128×128 px across 15 time steps:
 
-**Satellite Image Patches** (`s1asc/`, `s1dsc/`, `s2/`)
-NetCDF files (`.nc`) with 128×128 pixel patches across 15 time steps:
-- Sentinel-1: 2 polarizations (VV, VH), DEM, landslide mask (MASK), and metadata
-- Sentinel-2: 10 spectral bands (B02–B08, B8A, B11–B12), Scene Classification Layer (SCL), DEM, landslide mask (MASK), and metadata
-
-
-### Task Configurations (`tasks/`)
-
-Some patches are challenging even for human experts (e.g., <10 annotated pixels, ambiguous temporal signatures, missing/noisy labels). We provide two task-specific configurations:
-
-- **S12LS-LD**: Landslide detection with ~3,500-4,000 high-quality annotated patches (manual verification)
-- **S12LS-AD**: Anomaly detection with mixed annotated/non-annotated samples to learn normal vs. anomalous patterns
-
-#### Always Generated (Root Level)
-| File | Description |
-|------|-------------|
-| `config.json` | Filter criteria, split ratios, and stratification settings |
-
-#### Per-Satellite Folders (`s1asc/`, `s1dsc/`, `s2/`)
-| File | Description |
-|------|-------------|
-| `splits.json` | Train/val/test splits for this satellite modality |
-| `norm.json` | Per-band normalization statistics (mean/std) for this satellite |
-| `patch_locations.geojson` | Geographic patch locations with train/val/test assignments for this satellite |
-
-#### Multi-Modal Files
-| File | Description |
-|------|-------------|
-| `splits_aligned.json` | Train/val/test splits containing only patches available across all satellites |
-| `norm_aligned.json` | Normalization statistics computed from aligned patches only |
-| `patch_locations_aligned.geojson` | Geographic locations of patches available across all satellites |
-
-**Usage:**
-- Single-modal: Load `<satellite>/data_paths.json` + `<satellite>/norm_data.json`
-- Multi-modal: Load `splits.json` + `norm.json` for cross-modal fusion
-- Visualization: Open `patch_locations.geojson` in QGIS or mapping tools
-
-### Source Code (`src/`)
-
-Processing, training, and evaluation codebase:
-- Dataset loaders for NetCDF patches
-- Model architectures (CNNs, transformers, fusion networks)
-- Training pipelines with experiment tracking
-- Evaluation scripts for metrics and visualization
-- Preprocessing utilities for data augmentation and normalization
-
-## Data Record 
-
-Opening a patch with xarray reveals its structure:
-
+| Modality | Bands | Additional |
+|----------|-------|------------|
+| Sentinel-1 | VV, VH | DEM, MASK |
+| Sentinel-2 | B02-B08, B8A, B11-B12 | SCL, DEM, MASK |
 ```python
 >>> import xarray as xr
 >>> ds = xr.open_dataset("Sen12Landslides/data/s2/italy_s2_6982.nc")
@@ -199,48 +119,58 @@ Attributes:
     crs:              EPSG:32632  
 ```
 
-Sentinel-1 patches are structured the same way but include SAR bands (`VV`, `VH`) instead of optical ones, and set `satellite="s1"` in the attributes.
+## Tasks
 
-## Creating Custom Splits
+Some patches are challenging even for human experts (e.g., <10 annotated pixels, ambiguous temporal signatures, missing/noisy labels). We provide two task-specific configurations:
 
-Create train/val/test stratified splits with multi-modal alignment:
+Creating custom splits:
 ```bash
-python src/data/create_splits.py
+python src/data/create_splits.py  # Configure in configs/splits/config.yaml
 ```
 
-**Key settings** in `configs/config.yaml`:
-- `align_modalities: true` - Ensure all patches have all satellites (required for fusion)
-- `test_size: 0.2` / `val_size: 0.2` - Split ratios
-- `filter_criteria.annotated_only: true` - Only annotated patches
+#### Always Generated (Root Level)
+| File | Description |
+|------|-------------|
+| `config.json` | Filter criteria, split ratios, and stratification settings |
 
-Output includes `data_paths.json` (file lists), `norm_data.json` (statistics), and `patch_locations.geojson` (visualization).
+#### Per-Satellite Folders (`s1asc/`, `s1dsc/`, `s2/`)
+| File | Description |
+|------|-------------|
+| `splits.json` | Train/val/test splits for this satellite modality |
+| `norm.json` | Per-band normalization statistics (mean/std) for this satellite |
+| `patch_locations.geojson` | Geographic patch locations with train/val/test assignments for this satellite |
+
+#### Multi-Modal Files
+| File | Description |
+|------|-------------|
+| `splits_aligned.json` | Train/val/test splits containing only patches available across all satellites |
+| `norm_aligned.json` | Normalization statistics computed from aligned patches only |
+| `patch_locations_aligned.geojson` | Geographic locations of patches available across all satellites |
+
+**Usage:**
+- Single-modal training: Load `<satellite>/splits.json` + `<satellite>/norm.json`
+- Multi-modal training: Load `splits_aligned.json` + `norm_aligned.json` for cross-modal fusion
+- Visualization: Open `patch_locations.geojson` in QGIS or mapping tools
+
+## Evaluation
+
+Sen12Landslides has severe class imbalance (~3% landslides). Use metrics focusing on the positive class:
+
+> **Note:** Our paper reports macro-averaged metrics. Binary metrics (below) are provided for practical comparison.
 
 
-## Evaluation Metrics
-Sen12Landslides is characterized by severe class imbalance (~3% landslides). For a meaningful evaluation, we strongly recommend using metrics that focus on the positive (landslide) class.
+## Challenges
 
-_Note: _Note: This guidance differs from the macro-averaged metrics used in our paper. While macro-averaging was suitable for our paper's broad technical validation, we want to clarify that for practical landslide detection applications, metrics focusing on the positive class provide more actionable insights. Users comparing their results to our published paper should be aware of this distinction.__
+What makes this dataset demanding:
+
+1. **Severe class imbalance** (~3% landslides)
+2. **Small spatial extent** - landslides often span few pixels at 10m resolution
+3. **Multi-temporal complexity** - effective temporal fusion remains challenging
+4. **Geographic diversity** - varied terrain, vegetation, and climate
 
 
-## Performance Baselines & Dataset Challenges
+## Baselines
 
-### Baseline Results
-Please use the provided `S12LS-LD` splits for landslide detection tasks and the `S12LS-AD` for anomaly detection tasks.
-Updated `S12LS-LD` with better geographical split and higher quality is in lrogress and uploaded tomorrow.
-**Coming soon**: Updated benchmark table with the binary metrics on the new `S12LS-LD`.
+**Coming soon**: Updated benchmark table on `S12LS-LD` with binary metrics.
 
-### Why Landslide Detection is Challenging in Sen12Landslides
-
-This dataset presents several characteristics that make it a **demanding benchmark** for landslide detection methods:
-
-1. **Severe class imbalance** (~3% landslides) - requires methods robust to imbalanced learning
-2. **Small spatial extent** - Many landslides span only a few pixels at 10m resolution
-3. **Multi-temporal complexity** - Leveraging temporal information effectively remains an open challenge
-4. **Multi-modal fusion** - Optimal integration of Sentinel-1 (SAR) and Sentinel-2 (optical) is non-trivial
-5. **Geographic diversity** - Landslides occur across varied terrain, vegetation, and climate conditions
-
-These **challenges** make Sen12Landslides an excellent benchmark for:
-- Novel architectures for imbalanced, multi-modal learning
-- Temporal fusion strategies
-- Small object detection in remote sensing
-- Transfer learning and domain adaptation approaches
+Use provided task splits for reproducible comparisons.
