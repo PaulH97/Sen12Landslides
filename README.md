@@ -227,7 +227,7 @@ _Note: _Note: This guidance differs from the macro-averaged metrics used in our 
 ### Baseline Results
 Please use the provided `S12LS-LD` splits for landslide detection tasks and the `S12LS-AD` for anomaly detection tasks.
 Updated `S12LS-LD` with better geographical split and higher quality is in lrogress and uploaded tomorrow.
-Coming soon: Updated benchmark table with the extended metrics on the new `S12LS-LD`.
+**Coming soon**: Updated benchmark table with the binary metrics on the new `S12LS-LD`.
 
 ### Why Landslide Detection is Challenging in Sen12Landslides
 
@@ -244,5 +244,3 @@ These **challenges** make Sen12Landslides an excellent benchmark for:
 - Temporal fusion strategies
 - Small object detection in remote sensing
 - Transfer learning and domain adaptation approaches
-
-A low baseline performance on the landslide class reflects the genuine difficulty of this real-world problem and presents **significant opportunity for methodological innovation**. We encourage researchers to tackle these challenges and contribute improved methods.
