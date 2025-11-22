@@ -1,0 +1,45 @@
+_target_: src.lit_module.LitModule
+
+task: binary
+
+net: ${model.instance}
+
+loss:
+  _target_: src.lit_module.BCEDiceLoss
+  pos_weight: 10
+  dice_w: 0.5
+  smooth: 1.0
+
+metrics:
+  F1:
+    _target_: torchmetrics.classification.BinaryF1Score
+    threshold: 0.5
+  Precision:
+    _target_: torchmetrics.classification.BinaryPrecision
+    threshold: 0.5
+  Recall:
+    _target_: torchmetrics.classification.BinaryRecall
+    threshold: 0.5
+  IoU:
+    _target_: torchmetrics.classification.BinaryJaccardIndex
+    threshold: 0.5
+  AUROC:
+    _target_: torchmetrics.classification.BinaryAUROC
+  AP:
+    _target_: torchmetrics.classification.BinaryAveragePrecision
+
+optimizer:
+  _target_: torch.optim.AdamW
+  lr: 0.001
+  weight_decay: 0.01
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  factor: 0.5
+  patience: 5
+  mode: max
+  min_lr: 1e-6
+
+monitor_metric: "val/IoU"
+
+compile: false

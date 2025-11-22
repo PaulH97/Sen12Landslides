@@ -1,0 +1,48 @@
+# configs/lit_module/multitask.yaml
+_target_: src.lit_module.LitModule
+
+task: multiclass
+
+# Inject your model (with its own _target_) here:
+net: ${model.instance}
+
+# Per-head loss configs
+loss:
+  _target_: torch.nn.CrossEntropyLoss
+
+metrics:
+  F1:
+    _target_: torchmetrics.classification.MulticlassF1Score
+    num_classes: ${dataset.num_classes}
+    average: macro
+  Precision:
+    _target_: torchmetrics.classification.MulticlassPrecision
+    num_classes: ${dataset.num_classes}
+    average: macro
+  Recall:
+    _target_: torchmetrics.classification.MulticlassRecall
+    num_classes: ${dataset.num_classes}
+    average: macro
+  Jaccard:
+    _target_: torchmetrics.classification.MulticlassJaccardIndex
+    num_classes: ${dataset.num_classes}
+    average: macro
+
+optimizer:
+  _target_: torch.optim.AdamW
+  weight_decay: 1e-5
+  lr: 0.001
+
+scheduler:
+  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+  factor: 0.5
+  patience: 5
+  mode: min
+  threshold: 0.005      
+  threshold_mode: rel
+  cooldown: 1      
+  min_lr: 1e-5
+
+monitor_metric: "val/loss"
+
+compile: false
