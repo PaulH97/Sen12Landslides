@@ -288,7 +288,7 @@ def interactive_patch_review(data_folder, splits_path, output_file="patches_to_r
         if split in splits:
             all_patches.extend(splits[split])
 
-    selected_patches = [p for p in all_patches if 'usa_puerto' in p["id"].lower()]
+    selected_patches = [p for p in all_patches]
     print(f"Total patches to review after filtering: {len(all_patches)} -> {len(selected_patches)}")
     all_patches = selected_patches if len(selected_patches) > 0 else all_patches
 

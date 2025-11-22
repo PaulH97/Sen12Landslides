@@ -201,13 +201,3 @@ python src/pipeline/train.py --multirun model=utae,convlstm,convgru dataset=sen1
 | **Your Method** |  **0.00** | **0.00** | **0.00** | **0.00** | **0.00** |  **0.00** |
 
 Use provided `S12LS-LD` splits with hyperparameter from `configs/lit_module/binary` for reproducible comparisons.
-
-
-## Open Challenges
-
-What makes this dataset demanding:
-
-1. **Severe class imbalance** (~3% landslides)
-2. **Small spatial extent** - landslides often span few pixels at 10m resolution
-3. **Multi-temporal complexity** - effective temporal fusion remains challenging
-4. **Geographic diversity** - varied terrain, vegetation, and climate

@@ -1,7 +1,7 @@
-base_dir: /dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides
+base_dir: /Sen12Landslides
 split_settings:
   input_dir: ${base_dir}/data
-  output_dir: ${base_dir}/tasks/S12LS-LD-new
+  output_dir: ${base_dir}/tasks/S12LS-LD
   export_geodataframe: true # Export GeoDataFrame of splits
   clip_data: true   # Clip data: s2 [0-10000], s1 [-50,10], dem [0-8800]
   filter_criteria:
@@ -14,7 +14,6 @@ split_settings:
     annotated_ratio: null       # If mixing both, ratio of annotated (0.0-1.0)
     min_confidence: null  # e.g., 0.7 to keep only patches with high-confidence dates
     max_confidence: null  # e.g., 0.5 to keep only patches with low-confidence dates
-    low_quality_patches_file: null
   test_size: 0.2   # 20% for testing
   val_size: 0.2    
   seed: 42

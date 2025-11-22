@@ -4,8 +4,8 @@ defaults:
   - dataset: sen12ls_s2
   - datamodule: sen12ls
   - model: unet3d
-  - module: segmentation_bn
-  - trainer: cpu
+  - lit_module: binary
+  - trainer: gpu
   - logger: wandb 
   - callbacks: default
 
