@@ -52,15 +52,29 @@ def up_conv_block(in_dim, out_dim):
 
 
 class UNet3D(nn.Module):
-    def __init__(self, num_channels, num_classes, timeseries_len, dropout):
+    """3D UNet for semantic segmentation of image time series.
+
+    Example:
+        >>> model = UNet3D(
+        ...     in_channels=10,
+        ...     num_classes=1,
+        ...     img_res=128,
+        ...     dropout=0.0
+        ... )
+        >>> batch = {"img": torch.randn(2, 15, 10, 128, 128)}
+        >>> output = model(batch)
+        >>> print(output["segmentation"].shape)
+        torch.Size([2, 1, 128, 128])
+    """
+    def __init__(self, in_channels, num_classes, img_res=128, dropout=0.0):
         super(UNet3D, self).__init__()
-        self.in_channel = num_channels
+        self.in_channels = in_channels
         self.num_classes = num_classes
-        self.timesteps = timeseries_len
-        dropout = dropout
+        self.img_res = img_res
+        self.dropout_p = dropout
 
         feats = 16
-        self.en3 = conv_block(self.in_channel, feats * 4, feats * 4)
+        self.en3 = conv_block(self.in_channels, feats * 4, feats * 4)
         self.pool_3 = nn.MaxPool3d(kernel_size=2, stride=2, padding=0)
         self.en4 = conv_block(feats * 4, feats * 8, feats * 8)
         self.pool_4 = nn.MaxPool3d(kernel_size=2, stride=2, padding=0)
@@ -75,15 +89,29 @@ class UNet3D(nn.Module):
         self.final = nn.Conv3d(
             feats * 2, num_classes, kernel_size=3, stride=1, padding=1
         )
-        self.fn = nn.Linear(self.timesteps, 1)
-        self.dropout = nn.Dropout(p=dropout, inplace=True)
+        self.dropout = nn.Dropout(p=self.dropout_p, inplace=True)
+        
+        # Temporal aggregation layer (learnable)
+        self.temporal_pool = nn.AdaptiveAvgPool3d((1, None, None))
 
     def forward(self, x):
-        # Permute to change shape from NxTxCxHxW to NxCxTxHxW
-        x = x.permute(0, 2, 1, 3, 4)
-        assert (
-            x.shape[2] == self.timesteps
-        ), f"Expected {self.timesteps}, but got {x.shape[2]}"
+        """
+        Args:
+            x: dict or tensor
+               x["img"]: [B, T, C, H, W]
+               or direct tensor [B, T, C, H, W]
+        
+        Returns:
+            dict: {"segmentation": [B, num_classes, H, W]}
+        """
+        # Extract tensor from dict if needed
+        if isinstance(x, dict):
+            input_tensor = x["img"]
+        else:
+            input_tensor = x
+
+        # Permute from [B, T, C, H, W] to [B, C, T, H, W]
+        x = input_tensor.permute(0, 2, 1, 3, 4)
 
         en3 = self.en3(x)
         pool_3 = self.pool_3(en3)
@@ -91,10 +119,10 @@ class UNet3D(nn.Module):
         en4 = self.en4(pool_3)
         pool_4 = self.pool_4(en4)
 
-        center_in = self.center_in(pool_4)
-        center_out = self.center_out(center_in)
+        center_in_out = self.center_in(pool_4)
+        center_out = self.center_out(center_in_out)
 
-        # Upsample to match en4 dimensions before concatenation
+        # Upsample to match en4 dimensions
         center_out = F.interpolate(
             center_out, size=en4.shape[2:], mode="trilinear", align_corners=True
         )
@@ -103,34 +131,53 @@ class UNet3D(nn.Module):
         dc4 = self.dc4(concat4)
         trans3 = self.trans3(dc4)
 
-        # Upsample to match en3 dimensions before concatenation
+        # Upsample to match en3 dimensions
         trans3 = F.interpolate(
             trans3, size=en3.shape[2:], mode="trilinear", align_corners=True
         )
         concat3 = torch.cat([trans3, en3], dim=1)
 
         dc3 = self.dc3(concat3)
-        final = self.final(dc3)
+        dc3 = self.dropout(dc3)
+        out = self.final(dc3)  # [B, num_classes, T, H, W]
 
-        final = final.permute(0, 1, 3, 4, 2)
-        shape_num = final.shape[0:4]
-        final = final.reshape(-1, final.shape[4])
+        # Aggregate temporal dimension
+        out = self.temporal_pool(out)  # [B, num_classes, 1, H, W]
+        out = out.squeeze(2)  # [B, num_classes, H, W]
+        
+        # Upsample to original resolution if needed
+        if out.shape[-2:] != (self.img_res, self.img_res):
+            out = F.interpolate(
+                out, size=(self.img_res, self.img_res), 
+                mode="bilinear", align_corners=True
+            )
 
-        final = self.dropout(final)
-        final = self.fn(final)
-        final = final.reshape(shape_num)
-
-        return final
+        return {"segmentation": out}
 
 
 if __name__ == "__main__":
-    # works for t, h, w = 4n
-    bs, c, t, h, w = 2, 15, 16, 24, 24
-    inputs = torch.randn((bs, c, t, h, w))
-
-    net = UNet3D(
-        {"num_channels": c, "num_classes": 20, "max_seq_len": t, "dropout": 0.5}
+    bs, t, c, h, w = 4, 15, 10, 128, 128
+    
+    # Test with dict input
+    batch = {
+        "img": torch.randn(bs, t, c, h, w),
+        "dates": torch.randn(bs, t),
+        "msk": torch.randint(0, 2, (bs, h, w)),
+    }
+    
+    model = UNet3D(
+        in_channels=c,
+        num_classes=1, 
+        img_res=h,
+        dropout=0.0
     )
-
-    out = net(inputs)
-    print(out.shape)
+    
+    out = model(batch)
+    
+    print(f"✓ Test passed")
+    print(f"  Input:  {batch['img'].shape}")
+    print(f"  Output: {out['segmentation'].shape}")
+    
+    # Test direct tensor
+    out_direct = model(batch["img"])
+    print(f"✓ Direct tensor input also works")

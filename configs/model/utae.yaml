@@ -1,23 +1,8 @@
-_target_: src.models.lit_module.Sen12LsLitModule
-
 name: utae
-
-optimizer:
-  _target_: torch.optim.Adam
-  _partial_: true
-  lr: 0.0001
-
-scheduler:
-  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  _partial_: true
-  mode: min
-  factor: 0.1
-  patience: 5
-
-net:
+instance:
   _target_: src.models.utae.UTAE
-  num_channels: ${adjust_channels:${dataset.patch_channels}, ${experiment.variant}}
-  num_classes: 2
+  in_channels: ${dataset.num_channels}
+  num_classes: ${dataset.num_classes}
   encoder_widths: [64, 64, 64, 128]
   decoder_widths: [32, 32, 64, 128]
   str_conv_k: 4
@@ -28,9 +13,7 @@ net:
   n_head: 16
   d_model: 256
   d_k: 4
-  encoder: False
-  return_maps: False
+  encoder: false
+  return_maps: false
   pad_value: 0
   padding_mode: reflect
-
-compile: False

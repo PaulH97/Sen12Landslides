@@ -1,36 +1,18 @@
-_target_: src.models.lit_module.Sen12LsLitModule
-
 name: unet_convlstm
-
-optimizer:
-  _target_: torch.optim.Adam
-  _partial_: true
-  lr: 0.0001
-
-scheduler:
-  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  _partial_: true
-  mode: min
-  factor: 0.1
-  patience: 5
-
-net:
+instance:
   _target_: src.models.fcn_crnn.FCN_CRNN
-  num_classes: 2 
-  num_channels: ${adjust_channels:${dataset.patch_channels}, ${experiment.variant}}
-  timeseries_len: ${dataset.patch_length} 
-  img_res: ${dataset.patch_size} 
-  train_stage: 2                         # Training stage (0, 2, 3, or 4)                    
-  attn_channels: 128                      # Number of attention channels
-  cscl_win_size: 3                        # Attention window size
-  cscl_win_dilation: 1                    # Dilation for CSCL attention
-  cscl_win_stride: 1                      # Stride for CSCL attention
+  num_classes: ${dataset.num_classes}
+  in_channels: ${dataset.num_channels}
+  img_res: ${dataset.img_size} 
+  train_stage: 2                                        
+  attn_channels: 128             
+  cscl_win_size: 3         
+  cscl_win_dilation: 1     
+  cscl_win_stride: 1            
   attn_groups: 1                      
-  crnn_model_name: "clstm"                # Type of recurrent model ("gru" or "clstm")
-  bidirectional: false                    # Whether to use bidirectional CRNN
-  avg_hidden_states: true                 # Whether to average hidden states in CRNN
-  pretrained: false                       # Whether to use a pretrained backbone
-  early_feats: false                      # Whether to use early feature extraction in UNet
-  br_layer: false                         # Whether to use BR layer (default false)
-
-compile: False
+  crnn_model_name: "clstm"         
+  bidirectional: false                
+  avg_hidden_states: true             
+  pretrained: false                   
+  early_feats: false                
+  br_layer: false                     

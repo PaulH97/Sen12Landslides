@@ -10,35 +10,52 @@ from torchvision import models
 
 
 class FCN_CRNN(nn.Module):
+    """FCN + CRNN for semantic segmentation of image time series.
+    
+    This is essentially a U-Net encoder-decoder with a ConvLSTM/ConvGRU 
+    in the bottleneck to handle temporal information. It's sometimes called
+    "U-ConvLSTM" or "UNet-ConvLSTM" in literature.
+
+    Example:
+        >>> model = FCN_CRNN(
+        ...     in_channels=10,
+        ...     num_classes=1,
+        ...     img_res=128
+        ... )
+        >>> batch = {"img": torch.randn(2, 15, 10, 128, 128)}
+        >>> output = model(batch)
+        >>> print(output["segmentation"].shape)
+        torch.Size([2, 1, 128, 128])
+    """
     def __init__(
         self,
         num_classes,
-        num_channels,
-        timeseries_len,
+        in_channels,
         img_res,
-        train_stage,
-        attn_channels,
-        cscl_win_size,
-        cscl_win_dilation,
-        cscl_win_stride,
-        attn_groups,
-        crnn_model_name,
-        bidirectional,
-        avg_hidden_states,
-        pretrained,
-        early_feats,
-        br_layer,
+        train_stage=2,
+        attn_channels=128,
+        cscl_win_size=3,
+        cscl_win_dilation=1,
+        cscl_win_stride=1,
+        attn_groups=1,
+        crnn_model_name="clstm",
+        bidirectional=False,
+        avg_hidden_states=True,
+        pretrained=False,
+        early_feats=False,
+        br_layer=False,
     ):
         super(FCN_CRNN, self).__init__()
-        self.num_channels = num_channels
-        self.fcn_input_size = (timeseries_len, self.num_channels, img_res, img_res)
-        self.crnn_input_size = (timeseries_len, 128, img_res, img_res)
+        self.in_channels = in_channels
+        self.num_classes = num_classes
+        self.img_res = img_res
+        self.fcn_input_size = (None, self.in_channels, img_res, img_res)  # T is dynamic
+        self.crnn_input_size = (None, 128, img_res, img_res)
         self.hidden_dims = 128
         self.lstm_kernel_sizes = (3, 3)
         self.conv_kernel_size = 3
         self.lstm_num_layers = 1
         self.avg_hidden_states = avg_hidden_states
-        self.num_classes = num_classes
         self.bidirectional = bidirectional
         self.early_feats = early_feats
         self.use_planet = False
@@ -46,8 +63,8 @@ class FCN_CRNN(nn.Module):
         self.num_bands_dict = {
             "planet": 0,
             "s1": 0,
-            "s2": self.num_channels,
-            "all": self.num_channels,
+            "s2": self.in_channels,
+            "all": self.in_channels,
         }
         self.main_attn_type = "None"
         self.attn_dims = 32
@@ -67,7 +84,7 @@ class FCN_CRNN(nn.Module):
         self.stage = train_stage
         self.br_layer = br_layer
 
-        # Create UNet encoder/decoder and force them to float32
+        # Create UNet encoder/decoder
         if not self.early_feats:
             self.fcn = make_UNet_model(
                 n_class=self.crnn_input_size[1],
@@ -93,20 +110,22 @@ class FCN_CRNN(nn.Module):
 
         # Instantiate CRNN module(s)
         if self.crnn_model_name == "gru":
+            crnn_size = list(self.crnn_input_size)
+            crnn_size[0] = 1  # placeholder for T
             if self.early_feats:
                 self.crnn = CGRUSegmenter(
-                    self.crnn_input_size,
+                    crnn_size,
                     self.hidden_dims,
                     self.lstm_kernel_sizes,
                     self.conv_kernel_size,
                     self.lstm_num_layers,
-                    self.crnn_input_size[1],
+                    crnn_size[1],
                     self.bidirectional,
                     self.avg_hidden_states,
-                )
+                ).float()
             else:
                 self.crnn = CGRUSegmenter(
-                    self.crnn_input_size,
+                    crnn_size,
                     self.hidden_dims,
                     self.lstm_kernel_sizes,
                     self.conv_kernel_size,
@@ -114,17 +133,13 @@ class FCN_CRNN(nn.Module):
                     self.num_classes,
                     self.bidirectional,
                     self.avg_hidden_states,
-                )
-            # Force CRNN parameters to float32
-            self.crnn = self.crnn.float()
+                ).float()
         elif self.crnn_model_name == "clstm":
-            self.attns = self.get_attns()  # get_attns should return modules in float32
-            self.crnns = self.get_crnns()  # get_crnns should return modules in float32
-            self.final_convs = (
-                self.get_final_convs()
-            )  # these are already nn.Conv2d (will be float32 by default)
+            self.attns = self.get_attns()
+            self.crnns = self.get_crnns()
+            self.final_convs = self.get_final_convs()
 
-        # Setup attention mechanism for specific training stages and force to float32
+        # Setup attention mechanism
         if self.stage in [0, 3, 4]:
             self.attn_channels = attn_channels
             self.kernel_size = cscl_win_size
@@ -149,12 +164,26 @@ class FCN_CRNN(nn.Module):
                 kernel_size=self.conv_kernel_size,
                 padding=int((self.conv_kernel_size - 1) / 2),
             )
-            # Conv2d layers are float32 by default
 
-    def forward(self, input_tensor, hres_inputs=None):
-        # Convert the input tensor to the model's dtype
+    def forward(self, x):
+        """
+        Args:
+            x: dict or tensor
+               x["img"]: [B, T, C, H, W]
+               or direct tensor [B, T, C, H, W]
+        
+        Returns:
+            dict: {"segmentation": [B, num_classes, H, W]}
+        """
+        # Extract tensor from dict if needed
+        if isinstance(x, dict):
+            input_tensor = x["img"]
+        else:
+            input_tensor = x
+
         target_dtype = next(self.parameters()).dtype
         input_tensor = input_tensor.to(target_dtype)
+        
         batch, timestamps, bands, rows, cols = input_tensor.size()
         fcn_input = input_tensor.view(batch * timestamps, bands, rows, cols)
         fcn_input_hres = None
@@ -162,19 +191,18 @@ class FCN_CRNN(nn.Module):
         # Encode and decode features
         fcn_output = self.fcn(fcn_input, fcn_input_hres)
 
-        # Apply CRNN: reshape and get outputs (assume crnn outputs 5D: [B, T, C, H, W])
+        # Apply CRNN
         crnn_input = fcn_output.view(
             batch, timestamps, -1, fcn_output.shape[-2], fcn_output.shape[-1]
         )
-        if hasattr(self, "crnn_main") and self.crnn_main(crnn_input) is not None:
+        if hasattr(self, "crnn_main") and self.crnn_main is not None:
             crnn_output_fwd, crnn_output_rev = self.crnn_main(crnn_input)
         else:
             crnn_output_fwd = crnn_input
             crnn_output_rev = None
 
-        # Apply attention (or aggregation) based on model type:
+        # Apply attention based on model type
         if self.crnn_model_name == "gru":
-            # For GRU, simply use the CRNN output without attention.
             reweighted = crnn_output_fwd
         else:
             reweighted = attn_or_avg(
@@ -185,97 +213,57 @@ class FCN_CRNN(nn.Module):
                 self.bidirectional,
             )
 
-        # If reweighted is 5D ([B, T, C, H, W]), aggregate the time dimension.
+        # Aggregate time dimension if 5D
         if reweighted.dim() == 5:
-            # For example, average over the time dimension:
-            reweighted = torch.mean(reweighted, dim=1)  # Resulting shape: [B, C, H, W]
+            reweighted = torch.mean(reweighted, dim=1)
 
         if self.stage in [0]:
-            return self.attn_sim(reweighted)
+            out = self.attn_sim(reweighted)
         elif self.stage in [2]:
-            logits = self.main_finalconv(reweighted)
-            # Upsample logits from (H_out, W_out) to (img_res, img_res)
-            logits = F.interpolate(
-                logits,
-                size=(self.fcn_input_size[2], self.fcn_input_size[3]),
+            out = self.main_finalconv(reweighted)
+            out = F.interpolate(
+                out,
+                size=(self.img_res, self.img_res),
                 mode="bilinear",
                 align_corners=False,
             )
             if self.br_layer:
-                logits = self.br(logits)
-            return logits
+                out = self.br(out)
+        else:
+            out = reweighted
+
+        return {"segmentation": out}
 
     def get_crnns(self):
-        # Initialize CRNN layers and convert them to float32
-        self.crnn_main = self.crnn_enc4 = self.crnn_enc3 = self.crnn_enc2 = (
-            self.crnn_enc1
-        ) = None
+        self.crnn_main = self.crnn_enc4 = self.crnn_enc3 = self.crnn_enc2 = self.crnn_enc1 = None
+        crnn_size = [1, 128, self.img_res, self.img_res]  # T=1 placeholder
+        
         if self.early_feats:
             if self.main_crnn:
                 self.crnn_main = CLSTMSegmenter(
-                    self.crnn_input_size,
+                    crnn_size,
                     self.hidden_dims,
                     self.lstm_kernel_sizes,
                     self.conv_kernel_size,
                     self.lstm_num_layers,
-                    self.crnn_input_size[1],
+                    crnn_size[1],
                     self.bidirectional,
                     self.avg_hidden_states,
                 ).float()
             if self.enc_crnn:
-                crnn_input0, crnn_input1, crnn_input2, crnn_input3 = (
-                    self.crnn_input_size
-                )
                 self.crnn_enc4 = CLSTMSegmenter(
-                    [crnn_input0, crnn_input1 // 2, crnn_input2 * 2, crnn_input3 * 2],
-                    self.hidden_dims,
-                    self.lstm_kernel_sizes,
-                    self.conv_kernel_size,
-                    self.lstm_num_layers,
-                    self.crnn_input_size[1] // 2,
-                    self.bidirectional,
+                    [crnn_size[0], crnn_size[1] // 2, crnn_size[2] * 2, crnn_size[3] * 2],
+                    self.hidden_dims, self.lstm_kernel_sizes, self.conv_kernel_size,
+                    self.lstm_num_layers, crnn_size[1] // 2, self.bidirectional,
                 ).float()
                 self.crnn_enc3 = CLSTMSegmenter(
-                    [crnn_input0, crnn_input1 // 4, crnn_input2 * 4, crnn_input3 * 4],
-                    self.hidden_dims,
-                    self.lstm_kernel_sizes,
-                    self.conv_kernel_size,
-                    self.lstm_num_layers,
-                    self.crnn_input_size[1] // 4,
-                    self.bidirectional,
+                    [crnn_size[0], crnn_size[1] // 4, crnn_size[2] * 4, crnn_size[3] * 4],
+                    self.hidden_dims, self.lstm_kernel_sizes, self.conv_kernel_size,
+                    self.lstm_num_layers, crnn_size[1] // 4, self.bidirectional,
                 ).float()
-                if self.use_planet and not self.resize_planet:
-                    self.crnn_enc2 = CLSTMSegmenter(
-                        [
-                            crnn_input0,
-                            crnn_input1 // 8,
-                            crnn_input2 * 8,
-                            crnn_input3 * 8,
-                        ],
-                        self.hidden_dims,
-                        self.lstm_kernel_sizes,
-                        self.conv_kernel_size,
-                        self.lstm_num_layers,
-                        self.crnn_input_size[1] // 8,
-                        self.bidirectional,
-                    ).float()
-                    self.crnn_enc1 = CLSTMSegmenter(
-                        [
-                            crnn_input0,
-                            crnn_input1 // 16,
-                            crnn_input2 * 16,
-                            crnn_input3 * 16,
-                        ],
-                        self.hidden_dims,
-                        self.lstm_kernel_sizes,
-                        self.conv_kernel_size,
-                        self.lstm_num_layers,
-                        self.crnn_input_size[1] // 16,
-                        self.bidirectional,
-                    ).float()
         else:
             self.crnn_main = CLSTMSegmenter(
-                self.crnn_input_size,
+                crnn_size,
                 self.hidden_dims,
                 self.lstm_kernel_sizes,
                 self.conv_kernel_size,
@@ -283,96 +271,40 @@ class FCN_CRNN(nn.Module):
                 self.num_classes,
                 self.bidirectional,
             ).float()
+            
         self.crnns = {
-            "main": self.crnn_main,
-            "enc4": self.crnn_enc4,
-            "enc3": self.crnn_enc3,
-            "enc2": self.crnn_enc2,
-            "enc1": self.crnn_enc1,
+            "main": self.crnn_main, "enc4": self.crnn_enc4,
+            "enc3": self.crnn_enc3, "enc2": self.crnn_enc2, "enc1": self.crnn_enc1,
         }
         return self.crnns
 
     def get_attns(self):
-        # Initialize attention layers and force them to float32
         self.attn_enc4 = self.attn_enc3 = self.attn_enc2 = self.attn_enc1 = None
-        if self.early_feats:
-            if self.enc_attn:
-                self.attn_enc4 = ApplyAtt(
-                    self.enc_attn_type, self.hidden_dims, self.attn_dims
-                ).float()
-                self.attn_enc3 = ApplyAtt(
-                    self.enc_attn_type, self.hidden_dims, self.attn_dims
-                ).float()
-                if self.use_planet and not self.resize_planet:
-                    self.attn_enc2 = ApplyAtt(
-                        self.enc_attn_type, self.hidden_dims, self.attn_dims
-                    ).float()
-                    self.attn_enc1 = ApplyAtt(
-                        self.enc_attn_type, self.hidden_dims, self.attn_dims
-                    ).float()
-        self.attn_main = ApplyAtt(
-            self.main_attn_type, self.hidden_dims, self.attn_dims
-        ).float()
+        if self.early_feats and self.enc_attn:
+            self.attn_enc4 = ApplyAtt(self.enc_attn_type, self.hidden_dims, self.attn_dims).float()
+            self.attn_enc3 = ApplyAtt(self.enc_attn_type, self.hidden_dims, self.attn_dims).float()
+        self.attn_main = ApplyAtt(self.main_attn_type, self.hidden_dims, self.attn_dims).float()
         self.attns = {
-            "main": self.attn_main,
-            "enc4": self.attn_enc4,
-            "enc3": self.attn_enc3,
-            "enc2": self.attn_enc2,
-            "enc1": self.attn_enc1,
+            "main": self.attn_main, "enc4": self.attn_enc4,
+            "enc3": self.attn_enc3, "enc2": self.attn_enc2, "enc1": self.attn_enc1,
         }
         return self.attns
 
     def get_final_convs(self):
-        # Initialize final convolution layers (Conv2d layers are float32 by default)
-        self.enc4_finalconv = self.enc3_finalconv = self.enc2_finalconv = (
-            self.enc1_finalconv
-        ) = None
+        self.enc4_finalconv = self.enc3_finalconv = self.enc2_finalconv = self.enc1_finalconv = None
         if self.early_feats:
             self.main_finalconv = nn.Conv2d(
-                in_channels=self.hidden_dims,
-                out_channels=self.crnn_input_size[1],
-                kernel_size=self.conv_kernel_size,
-                padding=int((self.conv_kernel_size - 1) / 2),
+                self.hidden_dims, self.crnn_input_size[1],
+                self.conv_kernel_size, padding=(self.conv_kernel_size - 1) // 2,
             )
-            if self.enc_crnn:
-                self.enc4_finalconv = nn.Conv2d(
-                    in_channels=self.hidden_dims,
-                    out_channels=self.crnn_input_size[1] // 2,
-                    kernel_size=self.conv_kernel_size,
-                    padding=int((self.conv_kernel_size - 1) / 2),
-                )
-                self.enc3_finalconv = nn.Conv2d(
-                    in_channels=self.hidden_dims,
-                    out_channels=self.crnn_input_size[1] // 4,
-                    kernel_size=self.conv_kernel_size,
-                    padding=int((self.conv_kernel_size - 1) / 2),
-                )
-                if self.use_planet and not self.resize_planet:
-                    self.enc2_finalconv = nn.Conv2d(
-                        in_channels=self.hidden_dims,
-                        out_channels=self.crnn_input_size[1] // 8,
-                        kernel_size=self.conv_kernel_size,
-                        padding=int((self.conv_kernel_size - 1) / 2),
-                    )
-                    self.enc1_finalconv = nn.Conv2d(
-                        in_channels=self.hidden_dims,
-                        out_channels=self.crnn_input_size[1] // 16,
-                        kernel_size=self.conv_kernel_size,
-                        padding=int((self.conv_kernel_size - 1) / 2),
-                    )
         else:
             self.main_finalconv = nn.Conv2d(
-                in_channels=self.hidden_dims,
-                out_channels=self.num_classes,
-                kernel_size=self.conv_kernel_size,
-                padding=int((self.conv_kernel_size - 1) / 2),
+                self.hidden_dims, self.num_classes,
+                self.conv_kernel_size, padding=(self.conv_kernel_size - 1) // 2,
             )
         self.final_convs = {
-            "main": self.main_finalconv,
-            "enc4": self.enc4_finalconv,
-            "enc3": self.enc3_finalconv,
-            "enc2": self.enc2_finalconv,
-            "enc1": self.enc1_finalconv,
+            "main": self.main_finalconv, "enc4": self.enc4_finalconv,
+            "enc3": self.enc3_finalconv, "enc2": self.enc2_finalconv, "enc1": self.enc1_finalconv,
         }
         return self.final_convs
 
@@ -1805,3 +1737,30 @@ def get_upsampling_weight(in_channels, out_channels, kernel_size):
     )
     weight[range(in_channels), range(out_channels), :, :] = filt
     return torch.from_numpy(weight).float()
+
+
+if __name__ == "__main__":
+    bs, t, c, h, w = 4, 15, 10, 128, 128
+    
+    # Test with dict input
+    batch = {
+        "img": torch.randn(bs, t, c, h, w),
+        "dates": torch.randn(bs, t),
+        "msk": torch.randint(0, 2, (bs, h, w)),
+    }
+    
+    model = FCN_CRNN(
+        num_classes=1,
+        in_channels=c,
+        img_res=h,
+    )
+    
+    out = model(batch)
+    
+    print(f"✓ Test passed")
+    print(f"  Input:  {batch['img'].shape}")
+    print(f"  Output: {out['segmentation'].shape}")
+    
+    # Test direct tensor
+    out_direct = model(batch["img"])
+    print(f"✓ Direct tensor input also works")

@@ -1,24 +1,7 @@
-_target_: src.models.lit_module.Sen12LsLitModule
-
 name: unet3d
-
-optimizer:
-  _target_: torch.optim.Adam
-  _partial_: true
-  lr: 0.0001
-
-scheduler:
-  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  _partial_: true
-  mode: min
-  factor: 0.1
-  patience: 5
-
-net:
+instance:
   _target_: src.models.unet3d.UNet3D
-  timeseries_len: ${dataset.patch_length}
-  num_channels: ${adjust_channels:${dataset.patch_channels}, ${experiment.variant}}
-  num_classes: 2
+  in_channels: ${dataset.num_channels}
+  num_classes: ${dataset.num_classes}
+  img_res: ${dataset.img_size}
   dropout: 0.0
-
-compile: False

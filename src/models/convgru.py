@@ -10,23 +10,6 @@ from torch.autograd import Variable
 
 class ConvGRUCell(nn.Module):
     def __init__(self, input_size, input_dim, hidden_dim, kernel_size, bias):
-        """
-        Initialize ConvLSTM cell.
-
-        Parameters
-        ----------
-        input_size: (int, int)
-            Height and width of input tensor as (height, width).
-        input_dim: int
-            Number of channels of input tensor.
-        hidden_dim: int
-            Number of channels of hidden state.
-        kernel_size: (int, int)
-            Size of the convolutional kernel.
-        bias: bool
-            Whether or not to add the bias.
-        """
-
         super(ConvGRUCell, self).__init__()
 
         self.height, self.width = input_size
@@ -81,7 +64,6 @@ class ConvGRU(nn.Module):
 
         self._check_kernel_size_consistency(kernel_size)
 
-        # Make sure that both `kernel_size` and `hidden_dim` are lists having len == num_layers
         kernel_size = self._extend_for_multilayer(kernel_size, num_layers)
         hidden_dim = self._extend_for_multilayer(hidden_dim, num_layers)
         if not len(kernel_size) == len(hidden_dim) == num_layers:
@@ -113,27 +95,10 @@ class ConvGRU(nn.Module):
 
         self.cell_list = nn.ModuleList(cell_list)
 
-    def forward(
-        self, input_tensor, hidden_state=None, pad_mask=None, batch_positions=None
-    ):
-        """
-
-        Parameters
-        ----------
-        input_tensor: todo
-            5-D Tensor either of shape (t, b, c, h, w) or (b, t, c, h, w)
-        hidden_state: todo
-            None. todo implement stateful
-        pad_maks (b , t)
-        Returns
-        -------
-        last_state_list, layer_output
-        """
+    def forward(self, input_tensor, hidden_state=None, pad_mask=None):
         if not self.batch_first:
-            # (t, b, c, h, w) -> (b, t, c, h, w)
-            input_tensor.permute(1, 0, 2, 3, 4)
+            input_tensor = input_tensor.permute(1, 0, 2, 3, 4)
 
-        # Implement stateful ConvLSTM
         if hidden_state is not None:
             raise NotImplementedError()
         else:
@@ -148,7 +113,6 @@ class ConvGRU(nn.Module):
         cur_layer_input = input_tensor
 
         for layer_idx in range(self.num_layers):
-
             h = hidden_state[layer_idx]
             output_inner = []
             for t in range(seq_len):
@@ -198,50 +162,110 @@ class ConvGRU(nn.Module):
 
 
 class ConvGRU_Seg(nn.Module):
+    """A ConvGRU model for semantic segmentation of image time series.
+
+    Example:
+        >>> model = ConvGRU_Seg(
+        ...     num_classes=1,
+        ...     img_res=128,
+        ...     in_channels=10,
+        ...     kernel_size=(3, 3),
+        ...     hidden_dim=128
+        ... )
+        >>> batch = {"img": torch.randn(2, 15, 10, 128, 128)}
+        >>> output = model(batch)
+        >>> print(output["segmentation"].shape)
+        torch.Size([2, 1, 128, 128])
+    """
     def __init__(
         self,
         num_classes,
         img_res,
-        timeseries_len,
-        shape_pattern,
+        in_channels,
         kernel_size,
         hidden_dim,
-        pad_value,
+        pad_value=0,
     ):
         super(ConvGRU_Seg, self).__init__()
 
         self.num_classes = num_classes
         self.input_size = (img_res, img_res)
-        self.input_dim = timeseries_len
-        self.shape_pattern = shape_pattern
+        self.in_channels = in_channels
         self.kernel_size = tuple(kernel_size)
         self.hidden_dim = hidden_dim
-        self.pad_value = 0
+        self.pad_value = pad_value
 
         self.convgru_encoder = ConvGRU(
-            input_dim=self.input_dim,
+            input_dim=self.in_channels,
             input_size=self.input_size,
             hidden_dim=self.hidden_dim,
             kernel_size=self.kernel_size,
             return_all_layers=False,
         )
+        
         self.classification_layer = nn.Conv2d(
             in_channels=self.hidden_dim,
             out_channels=self.num_classes,
             kernel_size=self.kernel_size,
-            padding=1,
+            padding=self.kernel_size[0] // 2,
         )
-        self.pad_value = self.pad_value
 
-    def forward(self, input, batch_positions=None):
-        input = input.permute(0, 2, 1, 3, 4)  # NTCHW -> NCTHW
-        assert (
-            input.shape[2] == self.input_dim
-        ), f"Input of ConvGRU should be for temporal dimension {self.input_dim}, here {input.shape[2]}"
+    def forward(self, x):
+        """
+        Args:
+            x: dict or tensor
+               x["img"]: [B, T, C, H, W]
+               or direct tensor [B, T, C, H, W]
+        
+        Returns:
+            dict: {"segmentation": [B, num_classes, H, W]}
+        """
+        # Extract tensor from dict if needed
+        if isinstance(x, dict):
+            input_tensor = x["img"]  # [B, T, C, H, W]
+        else:
+            input_tensor = x
+        
+        # Create pad mask based on pad_value
         pad_mask = (
-            (input == self.pad_value).all(dim=-1).all(dim=-1).all(dim=-1)
-        )  # BxT pad mask
+            (input_tensor == self.pad_value)
+            .all(dim=-1).all(dim=-1).all(dim=-1)
+        )  # [B, T]
         pad_mask = pad_mask if pad_mask.any() else None
-        _, out = self.convgru_encoder(input, pad_mask=pad_mask)
+        
+        # ConvGRU forward
+        _, out = self.convgru_encoder(input_tensor, pad_mask=pad_mask)
+        
+        # Classification
         out = self.classification_layer(out)
-        return out
+        
+        return {"segmentation": out}
+
+    
+if __name__ == "__main__":
+    bs, t, c, h, w = 4, 15, 10, 128, 128
+    
+    # Test with dict input (new structure)
+    batch = {
+        "img": torch.randn(bs, t, c, h, w),
+        "dates": torch.randn(bs, t),
+        "msk": torch.randint(0, 2, (bs, h, w)),
+    }
+    
+    model = ConvGRU_Seg(
+        num_classes=1, 
+        img_res=h, 
+        in_channels=c, 
+        kernel_size=(3, 3), 
+        hidden_dim=16, 
+        pad_value=0
+    )
+    
+    out = model(batch)
+    
+    print(f"✓ Test passed")
+    print(f"  Input:  {batch['img'].shape}")
+    print(f"  Output: {out['segmentation'].shape}")
+    
+    out_direct = model(batch["img"])
+    print(f"✓ Direct tensor input also works")

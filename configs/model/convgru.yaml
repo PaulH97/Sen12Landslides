@@ -1,27 +1,9 @@
-_target_: src.models.lit_module.Sen12LsLitModule
-
 name: convgru
-
-optimizer:
-  _target_: torch.optim.Adam
-  _partial_: true
-  lr: 0.0001
-
-scheduler:
-  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  _partial_: true
-  mode: min
-  factor: 0.1
-  patience: 5
-
-net:
+instance:
   _target_: src.models.convgru.ConvGRU_Seg
-  img_res: ${dataset.patch_size}
-  timeseries_len: ${dataset.patch_length}
-  num_classes: 2
+  num_classes: ${dataset.num_classes}
+  img_res: ${dataset.img_size}
+  in_channels: ${dataset.num_channels}
   kernel_size: [3,3]
   hidden_dim: 180
   pad_value: 0
-  shape_pattern: 'NCTHW'
-
-compile: False
