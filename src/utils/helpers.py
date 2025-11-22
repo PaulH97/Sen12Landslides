@@ -1,10 +1,8 @@
 import random
-import shutil
-
 import matplotlib.pyplot as plt
 import numpy as np
 import xarray as xr
-
+from pathlib import Path
 
 def postprocess_s2_dataset(ds):
     """
@@ -65,117 +63,87 @@ def postprocess_s1_dataset(ds, epsilon=1e-6):
     return ds_out
 
 
-def run_sanity_check(data_loader, output_dir, num_samples=10):
-    """
-    Generate visualization samples from a data loader for sanity checking.
-    This function creates visualizations of random samples from the dataset,
-    displaying both the input images and corresponding masks. For Sentinel-1 data
-    (C<=3), it shows VV and VH polarizations separately. For Sentinel-2 or RGB data
-    (C>3), it displays RGB composite images. All visualizations are saved to the
-    specified output directory.
-    Parameters:
-    -----------
-    data_loader : torch.utils.data.DataLoader
-        The data loader containing the dataset to visualize
-    output_dir : pathlib.Path
-        Directory where visualization images will be saved.
-        Will be created if it doesn't exist or cleared if it does.
-    num_samples : int, default=10
-        Number of random samples to visualize from the dataset
-    Notes:
-    ------
-    - Expects data_loader.dataset to return dict with 'img' and 'msk' keys
-    - 'img' should be a tensor of shape [T, C, H, W] where:
-        T = number of time steps
-        C = number of channels
-        H = height
-        W = width
-    - 'msk' should be a tensor of shape [H, W] or [1, H, W]
-    - For C<=3, assumes Sentinel-1 style data (VV, VH, optional DEM)
-    - For C>3, assumes first 3 channels can be used as RGB
-    """
+def normalize_percentile(arr, p_low=2, p_high=98):
+    """Normalize array using percentile stretching."""
+    valid = arr[np.isfinite(arr)]
+    if len(valid) == 0:
+        return np.zeros_like(arr)
+    p2, p98 = np.percentile(valid, (p_low, p_high))
+    if p98 > p2:
+        return np.clip((arr - p2) / (p98 - p2), 0, 1)
+    return np.zeros_like(arr)
 
-    # Remove old sanity-check folder if it exists
-    if output_dir.exists():
-        shutil.rmtree(output_dir)
+
+def run_sanity_check(datamodule, output_dir, num_samples=5):
+    """Visualize samples from datamodule for sanity checking."""
+    output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+    
+    datamodule.setup()
+    dataset = datamodule.train_ds
+    
+    num_samples = min(num_samples, len(dataset))
+    indices = random.sample(range(len(dataset)), num_samples)
 
-    # Pick random indices from the dataset
-    random_indices = random.sample(range(len(data_loader.dataset)), num_samples)
-
-    for sample_idx in random_indices:
-        sample = data_loader.dataset[sample_idx]
-        img = sample["img"].numpy()  # [T, C, H, W]
-        msk = sample["msk"].numpy()  # [H, W] or [1, H, W]
-
-        # Flatten mask if needed
-        mask_img = msk.squeeze()
-
+    for idx in indices:
+        sample = dataset[idx]
+        
+        img = sample["img"].numpy()   # [T, C, H, W]
+        msk = sample["msk"].numpy()   # [H, W]
+        
         T, C, H, W = img.shape
-        output_file = output_dir / f"sample_{sample_idx}.png"
-
-        if C <= 3:
-            # ------------------------
-            # Sentinel-1 style VV & VH (+ DEM)
-            # ------------------------
-            fig, axs = plt.subplots(2, T + 1, figsize=(3 * (T + 1), 8), sharey=True)
-
-            for t in range(T):
-                vv = img[t, 0, :, :]
-                vh = img[t, 1, :, :]
-
-                def normalize(arr):
-                    rng = arr.max() - arr.min()
-                    return (arr - arr.min()) / rng if rng != 0 else np.zeros_like(arr)
-
-                vv_norm = normalize(vv)
-                vh_norm = normalize(vh)
-
-                axs[0, t].imshow(vv_norm, cmap="gray")
-                axs[0, t].axis("off")
-                axs[0, t].set_title(f"Time {t} VV", fontsize=8)
-
-                axs[1, t].imshow(vh_norm, cmap="gray")
-                axs[1, t].axis("off")
-                axs[1, t].set_title(f"Time {t} VH", fontsize=8)
-
-            # Mask in the last column
-            axs[0, -1].imshow(mask_img, cmap="gray")
-            axs[0, -1].axis("off")
-            axs[0, -1].set_title("Mask", fontsize=8)
-            axs[1, -1].imshow(mask_img, cmap="gray")
-            axs[1, -1].axis("off")
-
+        
+        # Detect modality and DEM: S1 (2 or 3), S2 (10 or 11)
+        has_dem = C in [3, 11]
+        is_s1 = C <= 3
+        
+        n_cols = T + 2 + (1 if has_dem else 0)  # timesteps + mask + overlay + DEM
+        fig, axes = plt.subplots(1, n_cols, figsize=(2.5 * n_cols, 2.5))
+        
+        # Plot timesteps
+        for t in range(T):
+            frame = img[t]
+            if is_s1:
+                axes[t].imshow(normalize_percentile(frame[0]), cmap="gray")
+            else:
+                rgb = normalize_percentile(frame[:3].transpose(1, 2, 0))
+                axes[t].imshow(rgb)
+            axes[t].set_title(f"T={t}", fontsize=8)
+            axes[t].axis("off")
+        
+        col = T
+        
+        # DEM (last channel if present)
+        if has_dem:
+            dem = img[0, -1]  # DEM is same for all timesteps
+            axes[col].imshow(normalize_percentile(dem), cmap="terrain")
+            axes[col].set_title("DEM", fontsize=8)
+            axes[col].axis("off")
+            col += 1
+        
+        # Mask
+        axes[col].imshow(msk, cmap="gray")
+        axes[col].set_title("Mask", fontsize=8)
+        axes[col].axis("off")
+        col += 1
+        
+        # Overlay
+        last_frame = img[-1]
+        if is_s1:
+            axes[col].imshow(normalize_percentile(last_frame[0]), cmap="gray")
         else:
-            # ------------------------
-            # Sentinel-2 style (RGB)
-            # ------------------------
-            fig, axs = plt.subplots(1, T + 1, figsize=(3 * (T + 1), 6), sharey=True)
-
-            for t in range(T):
-                # Use first 3 channels as RGB
-                # Adjust if your data uses a different ordering!
-                red = img[t, 2, :, :] if C >= 3 else img[t, 0, :, :]
-                green = img[t, 1, :, :] if C >= 2 else img[t, 0, :, :]
-                blue = img[t, 0, :, :]
-
-                rgb = np.stack([red, green, blue], axis=-1)
-                rgb_min, rgb_max = rgb.min(), rgb.max()
-                if rgb_max - rgb_min != 0:
-                    rgb_norm = (rgb - rgb_min) / (rgb_max - rgb_min)
-                else:
-                    rgb_norm = np.zeros_like(rgb)
-
-                axs[t].imshow(rgb_norm)
-                axs[t].axis("off")
-                axs[t].set_title(f"Time {t}", fontsize=8)
-
-            # Mask in the last column
-            axs[-1].imshow(mask_img, cmap="gray")
-            axs[-1].axis("off")
-            axs[-1].set_title("Mask", fontsize=8)
-
+            axes[col].imshow(normalize_percentile(last_frame[:3].transpose(1, 2, 0)))
+        
+        overlay = np.zeros((*msk.shape, 4))
+        overlay[msk == 1] = [1, 0, 0, 0.5]
+        axes[col].imshow(overlay)
+        axes[col].set_title("Overlay", fontsize=8)
+        axes[col].axis("off")
+        
         plt.tight_layout()
-        plt.savefig(output_file, dpi=150)
+        plt.savefig(output_dir / f"sample_{idx}.png", dpi=150, bbox_inches="tight")
         plt.close()
-        print(f"Saved sanity check to: {output_file}")
+        
+        print(f"Saved: sample_{idx}.png")
+    
+    print(f"\nSaved {num_samples} samples to {output_dir}")
