@@ -66,7 +66,7 @@ def main(cfg):
         datamodule.setup(stage="test")
         
         model = instantiate(cfg.model.instance, _convert_="all")
-        lit_module = instantiate(cfg.module, net=model, _convert_="all", _recursive_=False)
+        lit_module = instantiate(cfg.lit_module, net=model, _convert_="all", _recursive_=False)
         trainer = instantiate(cfg.trainer, logger=False, _convert_="all")
 
         ckpt_path = cfg.get("ckpt_path", None)

@@ -21,7 +21,7 @@ def main(cfg):
     
         datamodule = instantiate(cfg.datamodule)
         model = instantiate(cfg.model.instance, _convert_="all")
-        lit_module = instantiate(cfg.module, net=model, _convert_="all", _recursive_=False)
+        lit_module = instantiate(cfg.lit_module, net=model, _convert_="all", _recursive_=False)
 
         if cfg.get("sanity_check", False):
             output_dir = Path(HydraConfig.get().runtime.output_dir) / "sanity_check"
