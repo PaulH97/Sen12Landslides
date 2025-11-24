@@ -1,8 +1,7 @@
 _target_: lightning.pytorch.trainer.Trainer
 default_root_dir: ${exp_dir}
-max_epochs: 50
+max_epochs: 100
 accelerator: gpu
-strategy: ddp_find_unused_parameters_true
 devices: 4
 precision: 16-mixed
 gradient_clip_val: 1.0

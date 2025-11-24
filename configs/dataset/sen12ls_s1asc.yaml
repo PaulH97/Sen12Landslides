@@ -1,7 +1,7 @@
 # configs/dataset/sen12ls_s1asc.yaml
 name: sen12ls_s1asc
-root: /dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides
-task: S12LS-LD-HQ
+root: ${root_dir} # or /path/to/Sen12Landslides where data is located
+task: S12LS-LD
 modality: s1asc
 timeseries_len: 15
 img_size: 128

@@ -1,11 +1,11 @@
-base_dir: /Sen12Landslides
+base_dir: /path/to/Sen12Landslides # should contain 'data' and 'tasks' subdirs
 split_settings:
   input_dir: ${base_dir}/data
   output_dir: ${base_dir}/tasks/S12LS-LD
   export_geodataframe: true # Export GeoDataFrame of splits
   clip_data: true   # Clip data: s2 [0-10000], s1 [-50,10], dem [0-8800]
   filter_criteria:
-    min_annotated_pixel: 50 # Minimum annotated pixels to include a sample
+    min_annotated_pixel: 10 # Minimum annotated pixels to include a sample
     include_patterns: [] # Used to only include files from these inventories e.g., ["italy", "hiroshima"]
     exclude_patterns: ["usa_alaska", "nepal"]  # Used to exclude all files from these inventories e.g., ["newzealand", "kyrgyzstan1"]
     satellites: ["s1asc", "s1dsc", "s2"]  # e.g., ["s1asc", "s1dsc", "s2"] 

@@ -5,15 +5,16 @@ defaults:
   - datamodule: sen12ls
   - model: unet3d
   - lit_module: binary
-  - trainer: gpu
+  - trainer: ddp
   - logger: wandb 
   - callbacks: default
 
 # Timestamp for unique run dirs, e.g. 2025-09-19_19-42-07
 run_id: ${now:%Y-%m-%d_%H-%M-%S}
-exp_tag: "s12ls-ld"
+exp_tag: LD-Benchmark # 
 exp_name: ${model.name}_${dataset.name}_${exp_tag}_${run_id}
-root_dir: /Sen12Landslides
+root_dir: /path/to/Sen12Landslides # should contain 'data' and 'tasks' subdirs
+
 exp_dir: ${root_dir}/outputs/models/${exp_name}
 
 sanity_check: false
@@ -22,12 +23,12 @@ seed: 42
 
 hydra:
   run:
-    dir: ${exp_dir}                                 
+    dir: ${exp_dir}
   sweep:
-    dir: ${root_dir}/outputs/models/multiruns/${model.name}_${dataset.name}  
-    subdir: ${exp_name}       
+    dir: ${root_dir}/outputs/models
+    subdir: ${exp_name}
   job:
-    chdir: True
+    chdir: false
 
 ckpt_path: null  # Path to a checkpoint for prediction/testing
 preds_dir: null  # Directory to save predictions when running pipeline/predict.py

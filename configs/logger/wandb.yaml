@@ -1,9 +1,10 @@
 _target_: lightning.pytorch.loggers.wandb.WandbLogger              
 project: "Sen12Landslides"
 name: "${exp_name}"
-save_dir: ${hydra:runtime.output_dir}
-offline: False
-id: null                            
+save_dir: "${hydra:runtime.output_dir}" 
+id: null
+resume: False
+offline: False                 
 anonymous: null                    
 log_model: False                   
 prefix: ""                         
