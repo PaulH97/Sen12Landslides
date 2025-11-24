@@ -1,10 +1,10 @@
 {
   "input_dir": "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/data",
-  "output_dir": "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/tasks/S12LS-LD",
+  "output_dir": "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/tasks/S12LS-LD-10",
   "export_geodataframe": true,
   "clip_data": true,
   "filter_criteria": {
-    "min_annotated_pixel": 50,
+    "min_annotated_pixel": 10,
     "include_patterns": [],
     "exclude_patterns": [
       "usa_alaska",
