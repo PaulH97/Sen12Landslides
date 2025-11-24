@@ -39,6 +39,7 @@ Full Dataset
 | S1-asc   | 13,306  | 6,492     | 48.8%     |
 | S1-dsc   | 12,622  | 6,347     | 50.3%     |
 | S2       | 13,628  | 6,737     | 49.4%     |
+| Aligned  | 11,719  | 6,026     | 51.4%     |
 
 </td>
 <td>
@@ -46,15 +47,16 @@ Full Dataset
 Task Splits
 | Modality | S12LS-LD      | S12LS-AD        |
 |----------|:-------------:|:---------------:|
-| S1-asc   | 4,793 (100%)  | 13,306 (48.8%)  |
-| S1-dsc   | 4,666 (100%)  | 12,622 (50.3%)  |
-| S2       | 4,988 (100%)  | 13,628 (49.4%)  |
+| S1-asc   | 6,115 (100%)  | 13,306 (48.8%)  |
+| S1-dsc   | 5,980 (100%)  | 12,622 (50.3%)  |
+| S2       | 6,351 (100%)  | 13,628 (49.4%)  |
+| Aligned  | 5,666 (100%)  | 11,719 (51.4%)  |
 
 </td>
 </tr>
 </table>
 
-- S12LS-LD: Landslide detection with annotated patches 
+- S12LS-LD: Landslide detection with only annotated patches 
 - S12LS-AD: Anomaly detection with mixed annotated/non-annotated samples to learn normal vs. anomalous patterns
 - See `Sen12Landslides/tasks/<task>/config.json` for split details
 
@@ -121,7 +123,7 @@ Attributes:
 
 ## Tasks
 
-Some patches are challenging even for human experts (e.g., <10 annotated pixels, ambiguous temporal signatures, missing/noisy labels). We provide two task-specific configurations:
+We provide two task-specific configurations:
 
 Creating custom splits:
 ```bash
@@ -131,21 +133,21 @@ python src/data/create_splits.py  # Configure in configs/splits/config.yaml
 #### Always Generated (Root Level)
 | File | Description |
 |------|-------------|
-| `config.json` | Filter criteria, split ratios, and stratification settings |
+| config.json | Filter criteria, split ratios, and stratification settings |
 
 #### Per-Satellite Folders (`s1asc/`, `s1dsc/`, `s2/`)
 | File | Description |
 |------|-------------|
-| `splits.json` | Train/val/test splits for this satellite modality |
-| `norm.json` | Per-band normalization statistics (mean/std) for this satellite |
-| `patch_locations.geojson` | Geographic patch locations with train/val/test assignments for this satellite |
+| splits.json | Train/val/test splits for this satellite modality |
+| norm.json | Per-band normalization statistics (mean/std) for this satellite |
+| patch_locations.geojson | Geographic patch locations with train/val/test assignments for this satellite |
 
 #### Multi-Modal Files
 | File | Description |
 |------|-------------|
-| `splits_aligned.json` | Train/val/test splits containing only patches available across all satellites |
-| `norm_aligned.json` | Normalization statistics computed from aligned patches only |
-| `patch_locations_aligned.geojson` | Geographic locations of patches available across all satellites |
+| splits_aligned.json | Train/val/test splits containing only patches available across all satellites |
+| norm_aligned.json | Normalization statistics computed from aligned patches only |
+| patch_locations_aligned.geojson | Geographic locations of patches available across all satellites |
 
 **Usage:**
 - Single-modal training: Load `<satellite>/splits.json` + `<satellite>/norm.json`
@@ -161,10 +163,10 @@ This project uses [Hydra](https://hydra.cc/) for configuration management. See [
 
 | Config | Options |
 |--------|---------|
-| `model` | `utae`, `convgru`, `unet3d`, `fpn_convlstm` |
-| `dataset` | `sen12ls_s2`, `sen12ls_s1asc`, `sen12ls_s1dsc` |
-| `trainer` | `cpu`, `gpu`, `ddp` |
-| `lit_module` | `binary`, `multiclass` |
+| model | utae, convgru, unet3d, fpn_convlstm |
+| dataset | sen12ls_s2, sen12ls_s1asc, sen12ls_s1dsc |
+| trainer | cpu, gpu, ddp |
+| lit_module | binary, multiclass |
 
 
 ### Examples
@@ -184,20 +186,28 @@ python src/pipeline/train.py --multirun model=utae,convlstm,convgru dataset=sen1
 
 ## Baselines
 
-**Sen12Landslides** exhibits severe class imbalance, with landslide pixels constituting approximately **~3%** of the dataset. Consequently, standard metrics like Overall Accuracy (OA) are misleading (a model predicting "no landslide" everywhere would achieve ~97% OA). To ensure rigorous evaluation, we focus on metrics targeting the **positive class (Landslide)** rather than the background.
+Due to class imbalance (~3% landslides), we provide, additionaly to our macro-avg metrics in the paper, **binary metrics** on the landslide class for benchmarking against other detection methods. 
 
-> **Note:** While our accompanying paper reports *macro-averaged* metrics to assess overall semantic consistency, we provide **Binary Metrics** (Class 1: Landslide) below. We strongly recommend using these for practical comparisons with other works on landlside detection.
+> **Note:** To compare landslide detection performance, use the binary metrics below rather than the macro-averaged metrics from the paper.
 
 ### Benchmark Results (`S12LS-LD`)
 
-**Coming soon**: An updated benchmark table utilizing the architectures described in the paper with **binary metrics**:
+Benchmark using paper architectures with **binary metrics** on **Sentinel-2 + DEM**:
 
-| Model | Precision | Recall | F1-Score | IoU | AP | AUROC |
-| :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| ConvGRU |  *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
-| U-ConvLSTM |  *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
-| Unet3D | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
-| U-TAE | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* | *TBD* |
-| **Your Method** |  **0.00** | **0.00** | **0.00** | **0.00** | **0.00** |  **0.00** |
+| Model | Precision | Recall | F1-Score | IoU | AP 
+| :--- | :---: | :---: | :---: | :---: | :---: | 
+| ConvGRU | 0.51 | 0.67 | 0.58 | 0.40 | 0.57 | 
+| U-TAE | 0.37 | 0.87 | 0.52 | 0.35 | 0.66 |
+| Unet3D | 0.50 | 0.69 | 0.58 | 0.41 | 0.62 | 
+| U-ConvLSTM | 0.54 | 0.71 | 0.61 | 0.44 | 0.65 | 
 
-Use provided `S12LS-LD` splits with hyperparameter from `configs/lit_module/binary` for reproducible comparisons.
+A single training run was performed for each model on the `S12LS-LD` with `lit_module=binary` for 100 epochs (early stopping enabled). See `configs/` for full settings.
+
+## Challenges
+
+What makes this dataset demanding and a good resource for new methodological improvements to beat the baselines:
+
+1. **Severe class imbalance** (~3% landslides)
+2. **Small spatial extent** - landslides often span few pixels at 10m resolution
+3. **Multi-temporal complexity** - effective temporal fusion remains challenging
+4. **Geographic diversity** - varied terrain, vegetation, and climate
