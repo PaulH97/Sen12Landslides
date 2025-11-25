@@ -87,8 +87,8 @@ Each `.nc` file contains 128×128 px across 15 time steps:
 
 | Modality | Bands | Additional |
 |----------|-------|------------|
-| Sentinel-1 | VV, VH | DEM, MASK |
-| Sentinel-2 | B02-B08, B8A, B11-B12 | SCL, DEM, MASK |
+| Sentinel-1-NRB | VV, VH | DEM, MASK |
+| Sentinel-2-L2A | B02-B08, B8A, B11-B12 | SCL, DEM, MASK |
 ```python
 >>> import xarray as xr
 >>> ds = xr.open_dataset("Sen12Landslides/data/s2/italy_s2_6982.nc")
