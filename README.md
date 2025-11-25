@@ -56,7 +56,7 @@ Task Splits
 </tr>
 </table>
 
-- S12LS-LD: Landslide detection with only annotated patches 
+- S12LS-LD: Landslide detection with only annotated patches (>50 annotated pixels per patch)
 - S12LS-AD: Anomaly detection with mixed annotated/non-annotated samples to learn normal vs. anomalous patterns
 - See `Sen12Landslides/tasks/<task>/config.json` for split details
 
