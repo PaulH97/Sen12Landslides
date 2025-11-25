@@ -8,12 +8,17 @@ from hydra.utils import instantiate
 from lightning.pytorch import seed_everything
 from hydra.core.hydra_config import HydraConfig
 from torchinfo import summary
+import wandb
 
 from src.utils.helpers import run_sanity_check
 
 @hydra.main(config_path="../../configs", config_name="config", version_base=None)
 def main(cfg):
     try:
+        # Finish any existing wandb run FIRST
+        if wandb.run is not None:
+            wandb.finish()
+
         torch.autograd.set_detect_anomaly(True)
         torch.set_float32_matmul_precision('high')
         # torch.use_deterministic_algorithms(True, warn_only=False)
@@ -36,6 +41,7 @@ def main(cfg):
         traceback.print_exc()
         logging.error(f"Training crashed: {e}")
     finally:
+        wandb.finish()  
         torch.cuda.empty_cache()
         gc.collect()
 

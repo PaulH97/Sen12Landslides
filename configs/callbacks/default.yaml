@@ -1,5 +1,5 @@
 - _target_: lightning.pytorch.callbacks.ModelCheckpoint
-  dirpath: ${exp_dir}/checkpoints
+  dirpath: ${hydra:runtime.output_dir}/checkpoints
   filename: "best.ckpt"
   monitor: "val/IoU"
   save_top_k: 1

@@ -9,26 +9,21 @@ defaults:
   - logger: wandb 
   - callbacks: default
 
-# Timestamp for unique run dirs, e.g. 2025-09-19_19-42-07
-run_id: ${now:%Y-%m-%d_%H-%M-%S}
-exp_tag: LD-Benchmark # 
-exp_name: ${model.name}_${dataset.name}_${exp_tag}_${run_id}
-root_dir: /path/to/Sen12Landslides # should contain 'data' and 'tasks' subdirs
-
-exp_dir: ${root_dir}/outputs/models/${exp_name}
+exp_tag: LD-Benchmark # Experiment tag for logging/saving
+root_dir: path/to/Sen12Landslides
 
 sanity_check: false
 
-seed: 42
+seed: 777
 
 hydra:
   run:
-    dir: ${exp_dir}
+    dir: ${root_dir}/outputs/run/${model.name}_${dataset.name}_${exp_tag}_${now:%Y-%m-%d_%H-%M-%S}
   sweep:
-    dir: ${root_dir}/outputs/models
-    subdir: ${exp_name}
+    dir: ${root_dir}/outputs/multirun
+    subdir: ${model.name}_${dataset.name}_${exp_tag}_${now:%Y-%m-%d_%H-%M-%S}
   job:
     chdir: false
 
 ckpt_path: null  # Path to a checkpoint for prediction/testing
-preds_dir: null  # Directory to save predictions when running pipeline/predict.py
+preds_dir: null  # Directory to save predictions when running src/pipeline/predict.py
