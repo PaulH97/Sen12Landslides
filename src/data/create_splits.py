@@ -610,7 +610,7 @@ def create_norm_json(splits, input_dir, output_dir, n_workers, clip_data=True, f
     logging.info(f"Saved: {output_file}")
 
 
-@hydra.main(config_path="../../configs/splits", config_name="config", version_base="1.3.2")
+@hydra.main(config_path="../../configs/splits", config_name="default", version_base="1.3.2")
 def main(cfg: DictConfig):
     cfg_split = cfg.split_settings
     input_dir = Path(cfg_split.input_dir)
