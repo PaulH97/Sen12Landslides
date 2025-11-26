@@ -1,6 +1,6 @@
 # Just for testing training pipeline on CPU with minimal epochs and data
 _target_: lightning.pytorch.trainer.Trainer
-default_root_dir: ${exp_dir}
+default_root_dir: ${hydra:runtime.output_dir}
 max_epochs: 2
 accelerator: cpu  
 devices: 1

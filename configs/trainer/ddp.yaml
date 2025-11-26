@@ -1,5 +1,5 @@
 _target_: lightning.pytorch.trainer.Trainer
-default_root_dir: ${exp_dir}
+default_root_dir: ${hydra:runtime.output_dir}
 max_epochs: 100
 accelerator: gpu
 devices: 4
