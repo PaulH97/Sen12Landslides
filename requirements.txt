@@ -11,3 +11,4 @@ netCDF4
 rioxarray
 torchinfo
 wandb
+huggingface_hub
