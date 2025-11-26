@@ -12,12 +12,12 @@ A large-scale, multi-modal, multi-temporal collection of 128×128px Sentinel-1/2
 # Clone & setup
 git clone https://github.com/PaulH97/Sen12Landslides.git
 cd Sen12Landslides
+mkdir data
 pip install --upgrade huggingface_hub
 
 # Download dataset
-huggingface-cli login # paste your token from https://huggingface.co/settings/tokens (only once)
-mkdir data
-huggingface-cli download paulhoehn/Sen12Landslides --repo-type dataset --local-dir data
+hf auth login # paste your token from https://huggingface.co/settings/tokens (only once)
+hf download paulhoehn/Sen12Landslides --repo-type dataset --local-dir data
 
 # Extract patches
 for sensor in s1asc s1dsc s2; do
