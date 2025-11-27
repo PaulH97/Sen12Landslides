@@ -196,10 +196,10 @@ Benchmark using paper architectures with **binary metrics** on **Sentinel-2 + DE
 
 | Model | Precision | Recall | F1-Score | IoU | AP 
 | :--- | :---: | :---: | :---: | :---: | :---: | 
-| ConvGRU | 0.52 | 0.67 | 0.59 | 0.42 | 0.61 | 
-| U-TAE | 0.38 | 0.88 | 0.53 | 0.36 | 0.69 |
+| ConvGRU | 0.53 | 0.67 | 0.59 | 0.42 | 0.61 | 
+| U-TAE | 0.41 | 0.86 | 0.55 | 0.38 | 0.69 |
 | Unet3D | 0.52 | 0.68 | 0.59 | 0.42 | 0.63 | 
-| U-ConvLSTM | 0.56 | 0.73 | 0.63 | 0.46 | 0.68 | 
+| U-ConvLSTM | 0.55 | 0.73 | 0.63 | 0.46 | 0.67 | 
 
 Three training runs (`seed=42,123,777`) were performed for each model on the `S12LS-LD` split with `lit_module=binary` for 100 epochs (early stopping enabled). **Test metrics were averaged across seeds on the held-out test set.** See `configs/` for full settings.
 
