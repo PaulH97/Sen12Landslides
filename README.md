@@ -1,11 +1,10 @@
+[![License: CC BY 4.0](https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg)](https://creativecommons.org/licenses/by/4.0/)
+[![Paper: Nature](https://img.shields.io/badge/Paper-Nature%20Scientific%20Data-blue.svg)](https://www.nature.com/articles/s41597-025-06167-2)
+[![Dataset: Hugging Face](https://img.shields.io/badge/%F0%9F%A4%97%20Dataset-Hugging%20Face-yellow.svg)](https://huggingface.co/datasets/paulhoehn/Sen12Landslides)
+
 # Sen12Landslides: Spatio-Temporal Landslide & Anomaly Detection Dataset
 
 A large-scale, multi-modal, multi-temporal collection of 128×128px Sentinel-1/2 + DEM patches with 10m spatial resolution and with 75k landslide annotations.
-
-**Paper**: https://www.nature.com/articles/s41597-025-06167-2
-
-**Dataset**: https://huggingface.co/datasets/paulhoehn/Sen12Landslides
-
 
 ## Quick Start
 ```bash
