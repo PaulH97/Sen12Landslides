@@ -27,7 +27,7 @@ for sensor in s1asc s1dsc s2; do
 done
 ```
 
-Update the path of `root_dir` in the global config file (`Sen12Landslides/configs/config.yaml`) to your Sen12Landslides folder and make sure it contains the data like mentioned above. 
+Update the path of 'root_dir' in the global configuration file (Sen12Landslides/configs/config.yaml) to point to your Sen12Landslides folder, ensuring that it contains the aforementioned data. 
 
 ## Dataset Overview
 
@@ -159,7 +159,8 @@ python src/data/create_splits.py  # Configure in configs/splits/config.yaml
 
 ## Training
 
-This project uses [Hydra](https://hydra.cc/) for configuration management. See [Hydra documentation](https://hydra.cc/docs/intro/) for more details.
+This project uses [Hydra](https://hydra.cc/) for configuration management. See [Hydra documentation](https://hydra.cc/docs/intro/) for more details. Note that the standard parameters of some classes are overwritten by those in the configuration files. Therefore, ensure that you always update the config files under 'configs' accordingly for your hardware and requirements. 
+
 
 ### Available Configurations
 
