@@ -11,6 +11,7 @@ A large-scale, multi-modal, multi-temporal collection of 128×128px Sentinel-1/2
 # Clone & setup
 git clone https://github.com/PaulH97/Sen12Landslides.git
 cd Sen12Landslides
+pip install -e .
 mkdir data
 pip install --upgrade huggingface_hub
 
@@ -25,6 +26,8 @@ for sensor in s1asc s1dsc s2; do
   done
 done
 ```
+
+Update the path of `root_dir` in the global config file (`Sen12Landslides/configs/config.yaml`) to your Sen12Landslides folder and make sure it contains the data like mentioned above. 
 
 ## Dataset Overview
 
