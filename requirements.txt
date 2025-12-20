@@ -12,3 +12,4 @@ rioxarray
 torchinfo
 wandb
 huggingface_hub
+torchvision
