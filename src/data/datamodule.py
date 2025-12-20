@@ -9,8 +9,8 @@ class Sen12LsDataModule(LightningDataModule):
     def __init__(
         self,
         dataset_cfg,        
-        batch_size=8,
-        num_workers=4,
+        batch_size,
+        num_workers,
         train_transforms=None,
         val_transforms=None,
         test_transforms=None,
