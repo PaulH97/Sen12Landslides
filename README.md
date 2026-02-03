@@ -206,6 +206,8 @@ Benchmark using paper architectures with **binary metrics** on **Sentinel-2 + DE
 
 Three training runs (`seed=42,123,777`) were performed for each model on the `S12LS-LD` split with `lit_module=binary` for 100 epochs (early stopping enabled). **Test metrics were averaged across seeds on the held-out test set.** See `configs/` for full settings.
 
+> ⚠️ These models were trained as a "quick-run" proof of concept. These metrics should be viewed as a baseline that can be improved via architectural scaling and optimized feature fusion.
+
 ### Reproducibility
 ```bash
 # Train all baselines
