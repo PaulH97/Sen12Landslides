@@ -1,6 +1,6 @@
 # configs/dataset/sen12ls_s2.yaml
 name: sen12ls_s2 
-root: ${root_dir}/data_harmonized # or /data_raw
+version: harmonized # or raw
 task: S12LS-LD
 modality: s2
 timeseries_len: 15

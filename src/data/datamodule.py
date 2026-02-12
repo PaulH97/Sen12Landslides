@@ -8,6 +8,7 @@ from src.data.datasets import Sen12Landslides
 class Sen12LsDataModule(LightningDataModule):
     def __init__(
         self,
+        root_dir,
         dataset_cfg,        
         batch_size,
         num_workers,
@@ -17,8 +18,8 @@ class Sen12LsDataModule(LightningDataModule):
         pin_memory=True
     ):
         super().__init__()
-        self.root = Path(dataset_cfg.root)
-        self.data_root = self.root / "data"
+        self.root = Path(root_dir)
+        self.version = dataset_cfg.version
         self.task = dataset_cfg.task
         self.modality = dataset_cfg.modality.lower()
         self.use_dem = dataset_cfg.get("dem", False)
@@ -39,11 +40,12 @@ class Sen12LsDataModule(LightningDataModule):
         return splits
     
     def setup(self, stage=None):
-        splits_file = self.root / "tasks" / self.task / self.modality / "splits.json"
+        splits_file = self.root / "tasks" / self.task / self.version / self.modality / "splits.json"
         with open(splits_file, "r") as f:
             splits = json.load(f)
-        
-        splits = self._resolve_paths(splits, self.data_root)
+            
+        dataset_root = self.root / "data" / f"data_{self.version}"
+        splits = self._resolve_paths(splits, dataset_root)
         
         self.train_ds = Sen12Landslides(
             files=splits["train"],

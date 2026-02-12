@@ -1,8 +1,9 @@
 # configs/datamodule/sen12ls.yaml
 _target_: src.data.datamodule.Sen12LsDataModule
+root_dir: ${root_dir}
 dataset_cfg: ${dataset}
 batch_size: 16
-num_workers: 16
+num_workers: 8
 train_transforms:
   _target_: torchvision.transforms.Compose 
   transforms:
@@ -13,15 +14,15 @@ train_transforms:
     - _target_: src.data.transforms.RandomRotate90
       p: 0.5
     - _target_: src.data.transforms.Normalize
-      norm_json: ${root_dir}/tasks/${dataset.task}/${dataset.modality}/norm.json
+      norm_json: ${root_dir}/tasks/${dataset.task}/${dataset.version}/${dataset.modality}/norm.json
 val_transforms: 
   _target_: torchvision.transforms.Compose 
   transforms:
     - _target_: src.data.transforms.Normalize
-      norm_json: ${root_dir}/tasks/${dataset.task}/${dataset.modality}/norm.json
+      norm_json: ${root_dir}/tasks/${dataset.task}/${dataset.version}/${dataset.modality}/norm.json
 test_transforms:
   _target_: torchvision.transforms.Compose 
   transforms:
     - _target_: src.data.transforms.Normalize
-      norm_json: ${root_dir}/tasks/${dataset.task}/${dataset.modality}/norm.json
+      norm_json: ${root_dir}/tasks/${dataset.task}/${dataset.version}/${dataset.modality}/norm.json
 pin_memory: true
