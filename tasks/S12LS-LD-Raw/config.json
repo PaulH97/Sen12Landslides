@@ -1,18 +1,21 @@
 {
-  "input_dir": "/Sen12Landslides/data_local/final",
-  "output_dir": "/Sen12Landslides/tasks/S12LS-AD_test",
+  "input_dir": "Sen12Landslides/data/raw",
+  "output_dir": "Sen12Landslides/tasks/S12LS-LD-Raw",
   "export_geodataframe": true,
   "clip_data": true,
   "filter_criteria": {
-    "min_annotated_pixel": null,
+    "min_annotated_pixel": 50,
     "include_patterns": [],
-    "exclude_patterns": [],
+    "exclude_patterns": [
+      "usa_alaska",
+      "nepal"
+    ],
     "satellites": [
       "s1asc",
       "s1dsc",
       "s2"
     ],
-    "annotated_only": false,
+    "annotated_only": true,
     "non_annotated_only": false,
     "annotated_ratio": null,
     "min_confidence": null,

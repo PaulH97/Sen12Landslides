@@ -1,0 +1,28 @@
+{
+  "input_dir": "Sen12Landslides/data/harmonized",
+  "output_dir": "Sen12Landslides/tasks/S12LS-LD-Harmonized",
+  "export_geodataframe": true,
+  "clip_data": true,
+  "filter_criteria": {
+    "min_annotated_pixel": 50,
+    "include_patterns": [],
+    "exclude_patterns": [
+      "usa_alaska",
+      "nepal"
+    ],
+    "satellites": [
+      "s1asc",
+      "s1dsc",
+      "s2"
+    ],
+    "annotated_only": true,
+    "non_annotated_only": false,
+    "annotated_ratio": null,
+    "min_confidence": null,
+    "max_confidence": null
+  },
+  "test_size": 0.2,
+  "val_size": 0.2,
+  "seed": 42,
+  "n_workers": 20
+}
