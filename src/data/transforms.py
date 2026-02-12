@@ -60,7 +60,7 @@ class RandomRotate90:
 
 class Normalize:
     """Normalize image tensor using pre-computed statistics."""
-    def __init__(self, norm_json: str, clip_data: bool = True):
+    def __init__(self, norm_json: str, clip_data: bool = False):
         with open(norm_json) as f:
             self.norm_stats = json.load(f)
         
