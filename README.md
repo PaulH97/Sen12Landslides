@@ -17,12 +17,12 @@ pip install --upgrade huggingface_hub
 # Authenticate (only once)
 hf auth login
 
-# Download harmonized dataset
+# Download harmonized dataset or raw dataset
 mkdir -p data
 hf download paulhoehn/Sen12Landslides \
   --repo-type dataset \
   --local-dir data \
-  --include "data_harmonized/**" # or data_raw
+  --include "data_harmonized/**" 
 
 # Extract and clean up archives
 for sensor in s1asc s1dsc s2; do
@@ -74,13 +74,13 @@ Task Splits
 The harmonized version contains radiometrically consistent data that has been pre-processed and bounded for stable model training:
 
 - **Sentinel-1 (Backscatter):**
-  - *Transformation:* VH and VV bands converted from linear power to decibels (dB) via $10 \cdot \log_{10}(x)$
-  - *Clipping:* Values bounded to **[-50, 10] dB** to remove extreme noise and specular outliers
+  - VH and VV bands converted from linear power to decibels (dB) via $10 \cdot \log_{10}(x)$
+  - Values bounded to **[-50, 10] dB** to remove extreme noise and specular outliers
 - **Sentinel-2 (Reflectance):**
-  - *Correction:* Bands B02–B12 corrected for the +1000 DN radiometric offset introduced by ESA Baseline 04.00 (January 25, 2022 onward)
-  - *Clipping:* Values bounded to **[0, 10000] DN** to ensure physical reflectance consistency
+  - Bands B02–B12 corrected for the +1000 DN radiometric offset introduced by ESA Baseline 04.00 (January 25, 2022 onward)
+  - Values bounded to **[0, 10000] DN** to ensure physical reflectance consistency
 - **DEM (Elevation):**
-  - *Clipping:* Values bounded to **[0, 8800] m** to maintain a global terrain baseline
+  - Values bounded to **[0, 8800] m** to maintain a global terrain baseline
 
 ### Raw (original)
 
@@ -88,7 +88,7 @@ The raw version preserves the data exactly as published in the original dataset 
 
 - **Sentinel-1:** Linear power scale (not converted to dB)
 - **Sentinel-2:** No radiometric offset correction applied
-- **DEM/MASK:** Unmodified
+- **DEM:** Unmodified
 
 The conversion functions for both corrections are available in the `utils.py` file of the [GitHub repository](https://github.com/PaulH97/Sen12Landslides).
 
@@ -138,6 +138,7 @@ Each `.nc` file contains 128×128 px across 15 time steps:
 |----------|-------|------------|
 | Sentinel-1-NRB | VV, VH | DEM, MASK |
 | Sentinel-2-L2A | B02-B08, B8A, B11-B12 | SCL, DEM, MASK |
+
 ```python
 >>> import xarray as xr
 >>> ds = xr.open_dataset("Sen12Landslides/data/s2/italy_s2_6982.nc")
@@ -213,7 +214,7 @@ This project uses [Hydra](https://hydra.cc/) for configuration management. See [
 
 | Config | Options |
 |--------|---------|
-| model | utae, convgru, unet3d, fpn_convlstm |
+| model | utae, convgru, unet3d, unet_convlstm |
 | dataset | sen12ls_s2, sen12ls_s1asc, sen12ls_s1dsc |
 | trainer | cpu, gpu, ddp |
 | lit_module | binary, multiclass |
