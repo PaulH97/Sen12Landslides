@@ -12,17 +12,22 @@ A large-scale, multi-modal, multi-temporal collection of 128×128px Sentinel-1/2
 git clone https://github.com/PaulH97/Sen12Landslides.git
 cd Sen12Landslides
 pip install -e .
-mkdir data
 pip install --upgrade huggingface_hub
 
-# Download dataset
-hf auth login # paste your token from https://huggingface.co/settings/tokens (only once)
-hf download paulhoehn/Sen12Landslides --repo-type dataset --local-dir data
+# Authenticate (only once)
+hf auth login
 
-# Extract patches
+# Download harmonized dataset
+mkdir -p data
+hf download paulhoehn/Sen12Landslides \
+  --repo-type dataset \
+  --local-dir data \
+  --include "data_harmonized/**" # or data_raw
+
+# Extract and clean up archives
 for sensor in s1asc s1dsc s2; do
-  for archive in data/$sensor/*.tar.gz; do
-    tar -xzvf "$archive" -C "data/$sensor" && rm "$archive"
+  for archive in data/data_harmonized/$sensor/*.tar.gz; do
+    [ -f "$archive" ] && tar -xzf "$archive" -C "data/data_harmonized/$sensor" && rm "$archive"
   done
 done
 ```
@@ -62,25 +67,67 @@ Task Splits
 - S12LS-AD: Anomaly detection with mixed annotated/non-annotated samples to learn normal vs. anomalous patterns
 - See `Sen12Landslides/tasks/<task>/config.json` for split details
 
+## Dataset Versions
+
+### Harmonized (recommended)
+
+The harmonized version contains radiometrically consistent data that has been pre-processed and bounded for stable model training:
+
+- **Sentinel-1 (Backscatter):**
+  - *Transformation:* VH and VV bands converted from linear power to decibels (dB) via $10 \cdot \log_{10}(x)$
+  - *Clipping:* Values bounded to **[-50, 10] dB** to remove extreme noise and specular outliers
+- **Sentinel-2 (Reflectance):**
+  - *Correction:* Bands B02–B12 corrected for the +1000 DN radiometric offset introduced by ESA Baseline 04.00 (January 25, 2022 onward)
+  - *Clipping:* Values bounded to **[0, 10000] DN** to ensure physical reflectance consistency
+- **DEM (Elevation):**
+  - *Clipping:* Values bounded to **[0, 8800] m** to maintain a global terrain baseline
+
+### Raw (original)
+
+The raw version preserves the data exactly as published in the original dataset paper, ensuring full reproducibility of reported results:
+
+- **Sentinel-1:** Linear power scale (not converted to dB)
+- **Sentinel-2:** No radiometric offset correction applied
+- **DEM/MASK:** Unmodified
+
+The conversion functions for both corrections are available in the `utils.py` file of the [GitHub repository](https://github.com/PaulH97/Sen12Landslides).
+
 ### Data Structure
 ```
 Sen12Landslides/
 ├── data/
-│   ├── inventories.shp.zip              # Ground-truth landslide polygons
-│   ├── s1asc/                           # Sentinel-1 Ascending patches
-│   │   └── <region>_s1asc_<id>.nc
-│   ├── s1dsc/                           # Sentinel-1 Descending patches
-│   └── s2/                              # Sentinel-2 patches
+│   ├── data_harmonized/                    ← recommended for training
+│   │   ├── inventories.shp.zip
+│   │   ├── s1asc/                          Sentinel-1 Ascending (dB)
+│   │   │   └── <region>_s1asc_<id>.nc
+│   │   ├── s1dsc/                          Sentinel-1 Descending (dB)
+│   │   │   └── <region>_s1dsc_<id>.nc
+│   │   └── s2/                             Sentinel-2 (offset corrected)
+│   │       └── <region>_s2_<id>.nc
+│   └── data_raw/                           ← original paper version
+│       ├── inventories.shp.zip
+│       ├── s1asc/
+│       ├── s1dsc/
+│       └── s2/
 ├── tasks/
-│   ├── S12LS-LD/                        # Landslide detection task
+│   ├── S12LS-LD/                           Landslide detection
 │   │   ├── config.json
-│   │   └── <modality>/
-│   │       ├── splits.json              # Train/val/test file lists
-│   │       ├── norm.json                # Per-band mean/std
-│   │       └── patch_locations.geojson
-│   └── S12LS-AD/                        # Anomaly detection task
-│       └── ...
-└── src/                                 # Data loaders, models, training
+│   │   ├── harmonized/
+│   │   │   └── <modality>/
+│   │   │       ├── splits.json
+│   │   │       ├── norm.json
+│   │   │       └── patch_locations.geojson
+│   │   └── raw/
+│   │       └── <modality>/
+│   │           ├── splits.json
+│   │           ├── norm.json
+│   │           └── patch_locations.geojson
+│   └── S12LS-AD/                           Anomaly detection
+│       ├── harmonized/
+│       │   └── ...
+│       └── raw/
+│           └── ...
+└── src/                                    Data loaders, models, training
 ```
 
 ### Patch Format
@@ -191,7 +238,8 @@ python src/pipeline/train.py --multirun model=utae,convlstm,convgru dataset=sen1
 
 Due to class imbalance (~3% landslides), we provide, additionaly to our macro-avg metrics in the paper, **binary metrics** on the landslide class for benchmarking against other detection methods. 
 
-> **Note:** To compare landslide detection performance, use the binary metrics below rather than the macro-averaged metrics from the paper.
+> **Note:** To compare landslide detection performance, use the binary metrics below rather than the macro-averaged metrics from the paper. Baselines were trained on original raw data. The results for harmonized data may differ slightly, but they are planned to be provided here as well.
+
 
 ### Benchmark Results (`S12LS-LD`)
 
