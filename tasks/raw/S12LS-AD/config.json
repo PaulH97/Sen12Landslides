@@ -1,6 +1,6 @@
 {
   "input_dir": "Sen12Landslides/data/raw",
-  "output_dir": "Sen12Landslides/tasks/S12LS-AD-Raw",
+  "output_dir": "Sen12Landslides/tasks/raw/S12LS-AD",
   "export_geodataframe": true,
   "clip_data": true,
   "filter_criteria": {

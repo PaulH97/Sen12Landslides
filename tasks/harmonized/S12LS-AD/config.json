@@ -1,15 +1,12 @@
 {
-  "input_dir": "Sen12Landslides/data/raw",
-  "output_dir": "Sen12Landslides/tasks/S12LS-LD-Raw",
+  "input_dir": "Sen12Landslides/data/harmonized",
+  "output_dir": "Sen12Landslides/tasks/Harmonized/S12LS-AD",
   "export_geodataframe": true,
   "clip_data": true,
   "filter_criteria": {
-    "min_annotated_pixel": 50,
+    "min_annotated_pixel": null,
     "include_patterns": [],
-    "exclude_patterns": [
-      "usa_alaska",
-      "nepal"
-    ],
+    "exclude_patterns": [],
     "satellites": [
       "s1asc",
       "s1dsc",
