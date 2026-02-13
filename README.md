@@ -239,21 +239,21 @@ python src/pipeline/train.py --multirun model=utae,convlstm,convgru dataset=sen1
 
 Due to class imbalance (~3% landslides), we provide, additionaly to our macro-avg metrics in the paper, **binary metrics** on the landslide class for benchmarking against other detection methods. 
 
-> **Note:** To compare landslide detection performance, use the binary metrics below rather than the macro-averaged metrics from the paper. Baselines were trained on original raw data. The results for harmonized data may differ slightly, but they are planned to be provided here as well.
-
+> **Note:** To compare landslide detection performance, use the binary metrics below rather than the macro-averaged metrics from the paper.
 
 ### Benchmark Results (`S12LS-LD`)
 
 Benchmark using paper architectures with **binary metrics** on **Sentinel-2 + DEM**:
 
-| Model | Precision | Recall | F1-Score | IoU | AP 
-| :--- | :---: | :---: | :---: | :---: | :---: | 
-| ConvGRU | 0.53 | 0.67 | 0.59 | 0.42 | 0.61 | 
-| U-TAE | 0.41 | 0.86 | 0.55 | 0.38 | 0.69 |
-| Unet3D | 0.52 | 0.68 | 0.59 | 0.42 | 0.63 | 
-| U-ConvLSTM | 0.55 | 0.73 | 0.63 | 0.46 | 0.67 | 
+| Model      | AP    | F1    | IoU   | Precision | Recall |
+| ---------- | ----- | ----- | ----- | --------- | ------ |
+| U-ConvLSTM | 65,13 | 61,95 | 44,88 | 60,59     | 63,92  |
+| Unet3d     | 62,08 | 58,82 | 41,66 | 55,75     | 62,56  |
+| ConvGRU    | 60,00 | 59,06 | 41,91 | 56,72     | 61,77  |
+| U-TAE      | 67,75 | 61,80 | 44,74 | 53,19     | 74,90  |
 
-Three training runs (`seed=42,123,777`) were performed for each model on the `S12LS-LD` split with `lit_module=binary` for 100 epochs (early stopping enabled). **Test metrics were averaged across seeds on the held-out test set.** See `configs/` for full settings.
+
+Three training runs (`seed=42,123,777`) were performed for each model on the harmonized `S12LS-LD` split with `lit_module=binary` for 75 epochs. **Test metrics were averaged across seeds on the held-out test set.** See `configs/` for full settings.
 
 > ⚠️ These models were trained as a "quick-run" proof of concept. These metrics should be viewed as a baseline that can be improved via architectural scaling and optimized feature fusion.
 
