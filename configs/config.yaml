@@ -3,7 +3,7 @@ defaults:
   - _self_
   - dataset: sen12ls_s2
   - datamodule: sen12ls
-  - model: unet3d
+  - model: convgru
   - lit_module: binary
   - trainer: ddp
   - logger: wandb 
@@ -12,16 +12,16 @@ defaults:
 exp_tag: LD-Benchmark # Experiment tag for logging/saving
 root_dir: path/to/Sen12Landslides
 
-sanity_check: false
+sanity_check: true
 
-seed: 777
+seed: 42
 
 hydra:
   run:
-    dir: ${root_dir}/outputs/run/${model.name}_${dataset.name}_${exp_tag}_${now:%Y-%m-%d_%H-%M-%S}
+    dir: ${root_dir}/outputs/run/${model.name}_${dataset.name}_${exp_tag}_seed${seed}_${now:%Y-%m-%d_%H-%M-%S}
   sweep:
     dir: ${root_dir}/outputs/multirun
-    subdir: ${model.name}_${dataset.name}_${exp_tag}_${now:%Y-%m-%d_%H-%M-%S}
+    subdir: ${model.name}_${dataset.name}_${exp_tag}_seed${seed}_${now:%Y-%m-%d_%H-%M-%S}
   job:
     chdir: false
 
