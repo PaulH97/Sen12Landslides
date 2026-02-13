@@ -6,7 +6,7 @@ net: ${model.instance}
 
 loss:
   _target_: src.lit_module.BCEDiceLoss
-  pos_weight: 10
+  pos_weight: 5
   dice_w: 0.5
   smooth: 1.0
 
@@ -33,12 +33,12 @@ optimizer:
   lr: 0.001
   weight_decay: 0.01
 
-scheduler:
-  _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-  factor: 0.5
-  patience: 5
-  mode: max
-  min_lr: 1e-6
+# scheduler:
+#   _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
+#   factor: 0.5
+#   patience: 10
+#   mode: max
+#   min_lr: 1e-6
 
 monitor_metric: "val/IoU"
 
