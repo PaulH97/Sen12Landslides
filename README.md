@@ -255,7 +255,7 @@ Benchmark using paper architectures with **binary metrics** on **Sentinel-2 + DE
 
 Three training runs (`seed=42,123,777`) were performed for each model on the harmonized `S12LS-LD` split with `lit_module=binary` for 75 epochs. **Test metrics were averaged across seeds on the held-out test set.** See `configs/` for full settings.
 
-> ⚠️ These models serve as a "quick-run" proof of concept using a baseline **threshold of 0.5**, though optimizing this threshold significantly improves metrics alongside future architectural scaling and feature fusion.
+> ⚠️ These results are a proof of concept to demonstrate the dataset's utility, not an upper bound on achievable performance. Both the model architecture and the random train/val/test splits leave substantial room for improvement.
 
 ### Reproducibility
 ```bash
