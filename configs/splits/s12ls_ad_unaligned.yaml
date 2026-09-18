@@ -1,0 +1,28 @@
+# S12LS-AD, unaligned -- SUPERSEDED, kept only to reproduce the original AD
+# release. Use s12ls_ad.yaml for new work.
+# This reproduces the AD splits as they were first published: no
+# `fixed_splits_json`, so train/val/test is drawn from scratch over AD's own
+# candidate pool. The consequence is that its split assignment does not agree
+# with S12LS-LD -- 53% of LD's 4,392 patches sit in a different split here --
+# which is exactly why s12ls_ad.yaml exists.
+base_dir: path/to/Sen12Landslides
+split_settings:
+  input_dir: ${base_dir}/data/data_harmonized
+  output_dir: ${base_dir}/tasks/S12LS-AD-unaligned/harmonized
+  export_geodataframe: true
+  clip_data: false
+  fixed_splits_json: null      # the defining difference vs s12ls_ad.yaml
+  filter_criteria:
+    min_annotated_pixel: 0
+    include_patterns: []
+    exclude_patterns: []       # original run kept usa_alaska/nepal
+    satellites: ["s1asc", "s1dsc", "s2"]
+    annotated_only: false
+    non_annotated_only: false
+    annotated_ratio: 0.8
+    min_confidence: null
+    max_confidence: null
+  test_size: 0.2
+  val_size: 0.2
+  seed: 42
+  n_workers: 40

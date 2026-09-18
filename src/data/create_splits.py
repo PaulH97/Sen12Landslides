@@ -264,8 +264,29 @@ def compute_coverage_classes(files, n_workers=1):
             metadata_dict)
 
 
-def stratified_split_with_inventory(patches, coverage, inventory, test_size=0.2, val_size=0.2, seed=42):
-    """Split patches with inventory and coverage stratification."""
+def stratified_split_with_inventory(patches, coverage, inventory, test_size=0.2, val_size=0.2, seed=42,
+                                     fixed_split=None):
+    """Split patches into train/val/test, stratified by coverage class x inventory.
+
+    Args:
+        patches: array of patch file paths.
+        coverage: array of coverage classes (0/1/2), parallel to `patches`.
+        inventory: array of inventory names, parallel to `patches`.
+        test_size: fraction held out for test.
+        val_size: fraction of the remaining train pool held out for val.
+        seed: random seed for the stratified draws.
+        fixed_split: optional {patch_id: "train"|"val"|"test"}, typically loaded
+            from another task's splits_aligned.json. A patch whose file_key
+            appears here is assigned to that split directly and never enters
+            train_test_split, so a patch present in both tasks always ends up
+            in the same split. Only the remaining patches are stratified, and
+            test_size/val_size then apply to that remainder -- so new patches
+            still roughly follow the requested ratio instead of all landing in
+            train. Pass None to draw every split from scratch.
+
+    Returns:
+        (train, val, test) arrays of patch paths.
+    """
     if len(patches) == 0:
         return [], [], []
 
@@ -276,38 +297,76 @@ def stratified_split_with_inventory(patches, coverage, inventory, test_size=0.2,
     for inv, count in zip(unique_inv, counts):
         logging.info(f"  {inv}: {count} ({count/len(inventory)*100:.1f}%)")
     logging.info("="*60)
-    
-    # Create combined strata
-    combined = np.array([f"{c}_{i}" for c, i in zip(coverage, inventory)])
-    unique_strata, strata_counts = np.unique(combined, return_counts=True)
-    
-    # Handle singletons
-    rare_mask = np.isin(combined, unique_strata[strata_counts == 1])
-    train_forced = np.where(rare_mask)[0]
-    idx_split = np.where(~rare_mask)[0]
-    stratify = combined[~rare_mask] if len(idx_split) > 0 else None
-    
-    if len(train_forced) > 0:
-        logging.info(f"Forcing {len(train_forced)} singleton patches to train")
-    
-    # Split
-    if len(idx_split) > 0:
-        train_val_idx, test_idx = train_test_split(
-            idx_split, test_size=test_size, stratify=stratify, random_state=seed
-        )
-        
-        if len(train_val_idx) > 1:
-            stratify_tv = np.array([f"{coverage[i]}_{inventory[i]}" for i in train_val_idx])
-            train_idx, val_idx = train_test_split(
-                train_val_idx, test_size=val_size, stratify=stratify_tv, random_state=seed
-            )
-        else:
-            train_idx, val_idx = train_val_idx, np.array([], dtype=int)
+
+    # Partition into patches pinned by fixed_split and the free remainder.
+    # Indices here are positions into `patches`; the stratification below works
+    # on positions into the free subset and is mapped back at the end.
+    pinned_idx = {"train": [], "val": [], "test": []}
+    free_idx = []
+    if fixed_split:
+        for i, p in enumerate(patches):
+            split_name = fixed_split.get(file_key(p))
+            if split_name in pinned_idx:
+                pinned_idx[split_name].append(i)
+            else:
+                free_idx.append(i)
+        logging.info(f"fixed_split: {sum(len(v) for v in pinned_idx.values())} patches pinned "
+                     f"(train={len(pinned_idx['train'])}, val={len(pinned_idx['val'])}, "
+                     f"test={len(pinned_idx['test'])}), {len(free_idx)} left to stratify")
     else:
-        train_idx, val_idx, test_idx = np.array([], dtype=int), np.array([], dtype=int), np.array([], dtype=int)
-    
-    train_idx = np.concatenate([train_idx, train_forced]) if len(train_forced) > 0 else train_idx
-    
+        free_idx = list(range(len(patches)))
+
+    free_idx_arr = np.array(free_idx, dtype=int)
+    coverage_free = coverage[free_idx_arr] if len(free_idx_arr) else np.array([])
+    inventory_free = inventory[free_idx_arr] if len(free_idx_arr) else np.array([])
+
+    empty = np.array([], dtype=int)
+    # Strata are built over the free patches only -- a stratum that is a
+    # singleton here may well have more members among the pinned patches, but
+    # those are already placed and must not influence this draw.
+    combined = np.array([f"{c}_{i}" for c, i in zip(coverage_free, inventory_free)])
+
+    if len(combined) == 0:
+        train_idx_free, val_idx_free, test_idx_free = empty, empty, empty
+    else:
+        unique_strata, strata_counts = np.unique(combined, return_counts=True)
+
+        # Singleton strata cannot be stratified across splits -> force to train
+        rare_mask = np.isin(combined, unique_strata[strata_counts == 1])
+        train_forced = np.where(rare_mask)[0]
+        idx_split = np.where(~rare_mask)[0]
+        stratify = combined[~rare_mask] if len(idx_split) > 0 else None
+
+        if len(train_forced) > 0:
+            logging.info(f"Forcing {len(train_forced)} singleton patches to train")
+
+        if len(idx_split) > 0:
+            train_val_idx, test_idx_free = train_test_split(
+                idx_split, test_size=test_size, stratify=stratify, random_state=seed
+            )
+
+            if len(train_val_idx) > 1:
+                stratify_tv = np.array([f"{coverage_free[i]}_{inventory_free[i]}" for i in train_val_idx])
+                train_idx_free, val_idx_free = train_test_split(
+                    train_val_idx, test_size=val_size, stratify=stratify_tv, random_state=seed
+                )
+            else:
+                train_idx_free, val_idx_free = train_val_idx, empty
+        else:
+            train_idx_free, val_idx_free, test_idx_free = empty, empty, empty
+
+        if len(train_forced) > 0:
+            train_idx_free = np.concatenate([train_idx_free, train_forced])
+
+    # Map free-subset positions back onto `patches`, then add the pinned ones
+    def _resolve(idx_free, pinned):
+        mapped = free_idx_arr[idx_free.astype(int)] if len(idx_free) else empty
+        return np.concatenate([mapped, np.array(pinned, dtype=int)]).astype(int)
+
+    train_idx = _resolve(train_idx_free, pinned_idx["train"])
+    val_idx = _resolve(val_idx_free, pinned_idx["val"])
+    test_idx = _resolve(test_idx_free, pinned_idx["test"])
+
     # Log split distribution
     logging.info("SPLIT DISTRIBUTION BY INVENTORY")
     for inv in unique_inv:
@@ -315,11 +374,14 @@ def stratified_split_with_inventory(patches, coverage, inventory, test_size=0.2,
         val_c = np.sum(inventory[val_idx] == inv)
         test_c = np.sum(inventory[test_idx] == inv)
         total = train_c + val_c + test_c
+        if total == 0:
+            logging.info(f"{inv}: no patches assigned")
+            continue
         logging.info(f"{inv}: Train={train_c}/{total} ({train_c/total*100:.1f}%), "
                     f"Val={val_c}/{total} ({val_c/total*100:.1f}%), "
                     f"Test={test_c}/{total} ({test_c/total*100:.1f}%)")
     logging.info("="*60)
-    
+
     return patches[train_idx], patches[val_idx], patches[test_idx]
 
 
@@ -361,9 +423,10 @@ def align_files_strict(satellite_files):
     return aligned
 
 
-def split_and_extract_metadata(files, test_size, val_size, seed, n_workers, force_reference='s2', strict=False):
+def split_and_extract_metadata(files, test_size, val_size, seed, n_workers, force_reference='s2', strict=False,
+                                fixed_split=None):
     """Split files and extract metadata in one go.
-    
+
     Args:
         files: Dict of satellite files
         test_size: Test split size
@@ -372,6 +435,8 @@ def split_and_extract_metadata(files, test_size, val_size, seed, n_workers, forc
         n_workers: Number of workers
         force_reference: Force specific satellite as reference (default: 's2')
         strict: If True, raise error if forced reference is not available
+        fixed_split: optional {patch_id: split_name} to pin patches to an
+            existing split assignment -- see stratified_split_with_inventory
     """
     # Determine reference satellite
     if force_reference and force_reference in files:
@@ -398,7 +463,7 @@ def split_and_extract_metadata(files, test_size, val_size, seed, n_workers, forc
     
     # Split
     train, val, test = stratified_split_with_inventory(
-        patches, coverage, inventory, test_size, val_size, seed
+        patches, coverage, inventory, test_size, val_size, seed, fixed_split=fixed_split
     )
     
     # Extract patch IDs
@@ -624,7 +689,17 @@ def main(cfg: DictConfig):
 
     np.random.seed(seed)
     torch.manual_seed(seed)
-    
+
+    fixed_split = None
+    fixed_splits_json = cfg_split.get('fixed_splits_json', None)
+    if fixed_splits_json:
+        with open(fixed_splits_json) as f:
+            reference = json.load(f)
+        fixed_split = {entry['id']: split_name
+                       for split_name, entries in reference.items()
+                       for entry in entries}
+        logging.info(f"Pinning splits from {fixed_splits_json} ({len(fixed_split)} patches)")
+
     logging.info("="*80)
     logging.info("DATA SPLITTING PIPELINE")
     logging.info("="*80)
@@ -647,7 +722,7 @@ def main(cfg: DictConfig):
         # Dictionaries for the current satellite
         sat_files_dict = {sat: files}
      
-        patch_splits, metadata = split_and_extract_metadata(sat_files_dict, test_size, val_size, seed, n_workers, force_reference=None)  
+        patch_splits, metadata = split_and_extract_metadata(sat_files_dict, test_size, val_size, seed, n_workers, force_reference=None, fixed_split=fixed_split)
         splits = map_splits_to_files(sat_files_dict, patch_splits)
         unaligned_splits[sat] = splits[sat]
         metadata_dicts[sat] = metadata
@@ -671,7 +746,7 @@ def main(cfg: DictConfig):
         logging.info("\n[STEP 3] Creating ALIGNED splits (strict)...")
         
         aligned_files = align_files_strict(satellite_files)
-        patch_splits, metadata = split_and_extract_metadata(aligned_files, test_size, val_size, seed, n_workers, force_reference='s2')
+        patch_splits, metadata = split_and_extract_metadata(aligned_files, test_size, val_size, seed, n_workers, force_reference='s2', fixed_split=fixed_split)
         aligned_splits = map_splits_to_files(aligned_files, patch_splits)
         
         # Create global files

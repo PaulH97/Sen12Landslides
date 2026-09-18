@@ -52,20 +52,26 @@ Full Dataset
 <td>
 
 Task Splits
-| Modality | S12LS-LD      | S12LS-AD        |
-|----------|:-------------:|:---------------:|
-| S1-asc   | 4,793 (100%)  | 13,306 (48.8%)  |
-| S1-dsc   | 4,666 (100%)  | 12,622 (50.3%)  |
-| S2       | 4,988 (100%)  | 13,628 (49.4%)  |
-| Aligned  | 4,392 (100%)  | 11,719 (51.4%)  |
+| Modality | S12LS-LD | S12LS-AD |
+|----------|:--------:|:--------:|
+| S1-asc   | 4,793    | 13,137   |
+| S1-dsc   | 4,666    | 12,453   |
+| S2       | 4,988    | 13,467   |
+| Aligned  | 4,392    | 11,564   |
 
 </td>
 </tr>
 </table>
 
-- S12LS-LD: Landslide detection with only annotated patches (>50 annotated pixels per patch)
-- S12LS-AD: Anomaly detection with mixed annotated/non-annotated samples to learn normal vs. anomalous patterns
+- S12LS-LD: landslide detection, only annotated patches (>50 annotated pixels per patch)
+- S12LS-AD: anomaly detection, S12LS-LD plus non-annotated patches to learn normal vs. anomalous patterns. Every S12LS-LD patch keeps its exact train/val/test assignment here, so the two tasks stay directly comparable (see `s12ls_ad.yaml`'s `fixed_splits_json`)
+- S12LS-AD-unaligned: superseded original AD release, split independently of S12LS-LD and still including the usa_alaska/nepal inventories. Reference only
 - See `Sen12Landslides/tasks/<task>/config.json` for split details
+
+### Reproducing the splits
+
+- `src/data/create_splits.py` builds every task: pick one with `--config-name` (configs in `configs/splits/`)
+- `s12ls_ad` must run after `s12ls_ld` for the same dataset version, since it pins shared patches to LD's `splits_aligned.json` via `fixed_splits_json`.
 
 ## Dataset Versions
 
@@ -122,11 +128,23 @@ Sen12Landslides/
 │   │           ├── splits.json
 │   │           ├── norm.json
 │   │           └── patch_locations.geojson
-│   └── S12LS-AD/                           Anomaly detection
+│   ├── S12LS-AD/                           Anomaly detection (splits pinned to S12LS-LD)
+│   │   ├── config.json
+│   │   ├── harmonized/
+│   │   │   ├── <modality>/
+│   │   │   │   ├── splits.json             per-satellite split
+│   │   │   │   ├── norm.json
+│   │   │   │   └── patch_locations.geojson
+│   │   │   ├── splits_aligned.json         strict split (all satellites present)
+│   │   │   ├── norm_aligned.json
+│   │   │   └── patch_locations_aligned.geojson
+│   │   └── raw/
+│   │       └── ... (same layout)
+│   └── S12LS-AD-unaligned/                 superseded AD release, reference only
 │       ├── harmonized/
-│       │   └── ...
+│       │   └── ... (same layout as S12LS-AD)
 │       └── raw/
-│           └── ...
+│           └── ... (same layout)
 └── src/                                    Data loaders, models, training
 ```
 

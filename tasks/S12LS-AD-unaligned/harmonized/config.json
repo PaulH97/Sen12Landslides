@@ -1,0 +1,25 @@
+{
+  "input_dir": "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/data/data_harmonized",
+  "output_dir": "/dss/dsstbyfs02/pn49cu/pn49cu-dss-0006/Sen12Landslides/tasks/S12LS-AD-harmonized",
+  "export_geodataframe": true,
+  "clip_data": false,
+  "filter_criteria": {
+    "min_annotated_pixel": 0,
+    "include_patterns": [],
+    "exclude_patterns": [],
+    "satellites": [
+      "s1asc",
+      "s1dsc",
+      "s2"
+    ],
+    "annotated_only": false,
+    "non_annotated_only": false,
+    "annotated_ratio": 0.8,
+    "min_confidence": null,
+    "max_confidence": null
+  },
+  "test_size": 0.2,
+  "val_size": 0.2,
+  "seed": 42,
+  "n_workers": 40
+}
