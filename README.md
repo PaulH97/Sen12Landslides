@@ -41,29 +41,29 @@ Update the path of `root_dir` in the global configuration file (`Sen12Landslides
 <td>
 
 Full Dataset
-| Modality | Positive | Negative |
-|----------|:--------:|:--------:|
-| S1-asc   | 6,492    | 6,814    |
-| S1-dsc   | 6,347    | 6,275    |
-| S2       | 6,737    | 6,891    |
-| Aligned  | 6,026    | 5,693    |
+| Modality | Positive | Negative | Total  |
+|----------|:--------:|:--------:|:------:|
+| S1-asc   | 6,492    | 6,814    | 13,306 |
+| S1-dsc   | 6,347    | 6,275    | 12,622 |
+| S2       | 6,737    | 6,891    | 13,628 |
+| Aligned  | 6,026    | 5,693    | 11,719 |
 
 </td>
 <td>
 
 Task Splits
-| Modality | S12LS-LD | S12LS-AD (pos.) | S12LS-AD (neg.) |
-|----------|:--------:|:---------------:|:---------------:|
-| S1-asc   | 4,793    | 4,793           | 8,344           |
-| S1-dsc   | 4,666    | 4,666           | 7,787           |
-| S2       | 4,988    | 4,988           | 8,479           |
-| Aligned  | 4,392    | 4,392           | 7,172           |
+| Modality | S12LS-LD | S12LS-AD (pos.) | S12LS-AD (neg.) | S12LS-AD (total) |
+|----------|:--------:|:---------------:|:---------------:|:----------------:|
+| S1-asc   | 4,793    | 4,793           | 8,344           | 13,137           |
+| S1-dsc   | 4,666    | 4,666           | 7,787           | 12,453           |
+| S2       | 4,988    | 4,988           | 8,479           | 13,467           |
+| Aligned  | 4,392    | 4,392           | 7,172           | 11,564           |
 
 </td>
 </tr>
 </table>
 
-- S12LS-LD: landslide detection, only annotated (positive) patches (>50 annotated pixels per patch)
+- S12LS-LD: landslide detection, only annotated (positive) patches
 - S12LS-AD: anomaly detection, S12LS-LD's positive patches plus the negative (non-annotated) patches listed above, used to learn normal vs. anomalous patterns. Every S12LS-LD patch keeps its exact train/val/test assignment here, so the two tasks stay directly comparable.
 - S12LS-AD-unaligned: superseded original AD release, split independently of S12LS-LD and still including the usa_alaska/nepal inventories. Reference only
 - See `Sen12Landslides/tasks/<task>/config.json` for split details
