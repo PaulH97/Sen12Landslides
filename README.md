@@ -54,24 +54,24 @@ Full Dataset
 Task Splits
 | Modality | S12LS-LD | S12LS-AD (pos.) | S12LS-AD (neg.) | S12LS-AD (total) |
 |----------|:--------:|:---------------:|:---------------:|:----------------:|
-| S1-asc   | 4,793    | 4,793           | 8,344           | 13,137           |
-| S1-dsc   | 4,666    | 4,666           | 7,787           | 12,453           |
-| S2       | 4,988    | 4,988           | 8,479           | 13,467           |
-| Aligned  | 4,392    | 4,392           | 7,172           | 11,564           |
+| S1-asc   | 4,793    | 3,075           | 4,880           | 7,955            |
+| S1-dsc   | 4,666    | 2,912           | 4,339           | 7,251            |
+| S2       | 4,988    | 3,262           | 4,824           | 8,086            |
+| Aligned  | 4,392    | 2,720           | 3,829           | 6,549            |
 
 </td>
 </tr>
 </table>
 
 - S12LS-LD: landslide detection, only annotated (positive) patches
-- S12LS-AD: anomaly detection, S12LS-LD's positive patches plus the negative (non-annotated) patches listed above, used to learn normal vs. anomalous patterns. Every S12LS-LD patch keeps its exact train/val/test assignment here, so the two tasks stay directly comparable.
+- S12LS-AD: anomaly detection, S12LS-LD patches as positives and annotation-free patches as negatives, single-event inventories only (`event_date` in every entry); per version it holds `splits*.json`, `patch_locations*.geojson` and separate `norm_positive*.json` / `norm_negative*.json`, per-satellite versions in `<satellite>/`.
 - S12LS-AD-unaligned: superseded original AD release, split independently of S12LS-LD and still including the usa_alaska/nepal inventories. Reference only
 - See `Sen12Landslides/tasks/<task>/config.json` for split details
 
 ### Reproducing the splits
 
 - `src/data/create_splits.py` builds every task: pick one with `--config-name` (configs in `configs/splits/`)
-- `s12ls_ad` must run after `s12ls_ld` for the same dataset version, since it pins shared patches to LD's `splits_aligned.json` via `fixed_splits_json`.
+- `s12ls_ad` pins its splits to its own committed `splits_aligned.json` (original release: git `590a726`); rebuild with `sbatch create_splits.sh s12ls_ad [raw]`.
 
 ## Dataset Versions
 
@@ -128,15 +128,17 @@ Sen12Landslides/
 │   │           ├── splits.json
 │   │           ├── norm.json
 │   │           └── patch_locations.geojson
-│   ├── S12LS-AD/                           Anomaly detection (splits pinned to S12LS-LD)
-│   │   ├── config.json
+│   ├── S12LS-AD/                           Anomaly detection (single-event inventories, see above)
 │   │   ├── harmonized/
+│   │   │   ├── config.json
 │   │   │   ├── <modality>/
-│   │   │   │   ├── splits.json             per-satellite split
-│   │   │   │   ├── norm.json
+│   │   │   │   ├── splits.json             per-satellite split, with event_date
+│   │   │   │   ├── norm_positive.json
+│   │   │   │   ├── norm_negative.json
 │   │   │   │   └── patch_locations.geojson
-│   │   │   ├── splits_aligned.json         strict split (all satellites present)
-│   │   │   ├── norm_aligned.json
+│   │   │   ├── splits_aligned.json         strict split (all satellites present), with event_date
+│   │   │   ├── norm_positive_aligned.json
+│   │   │   ├── norm_negative_aligned.json
 │   │   │   └── patch_locations_aligned.geojson
 │   │   └── raw/
 │   │       └── ... (same layout)
@@ -214,7 +216,7 @@ python src/data/create_splits.py  # Configure in configs/splits/config.yaml
 | File | Description |
 |------|-------------|
 | splits_aligned.json | Train/val/test splits containing only patches available across all satellites |
-| norm_aligned.json | Normalization statistics computed from aligned patches only |
+| norm_aligned.json | Normalization statistics computed from aligned patches only (S12LS-AD: `norm_positive_aligned.json` and `norm_negative_aligned.json` instead) |
 | patch_locations_aligned.geojson | Geographic locations of patches available across all satellites |
 
 **Usage:**

@@ -93,6 +93,21 @@ def compute_mean_std(files, n_workers=4, clip_data=True):
     return mean, std
 
 
+def inventory_name(attrs, file_path):
+    """Inventory name from the file attributes, else from the file name."""
+    for attr in ['inventory', 'region', 'location']:
+        if attr in attrs:
+            return str(attrs[attr]).lower()
+    filename = re.sub(r"_(s1asc|s1dsc|s2)$", "", file_path.stem.lower())
+    parts = filename.split('_')
+    return parts[0] if parts else 'unknown'
+
+
+def parse_event_dates(raw):
+    """Event dates of one patch: 'a,b,c' -> {'a','b','c'}; empty / None -> set()."""
+    return {p.strip() for p in str(raw or "").split(",") if p.strip() and p.strip() != "None"}
+
+
 def check_file_metadata(file_path, criteria):
     """Check if file meets filtering criteria."""
     filename = file_path.name.lower()
@@ -140,6 +155,8 @@ def check_file_metadata(file_path, criteria):
                 confidence = 1.0
             
             metadata["confidence"] = confidence
+            metadata["inventory"] = inventory_name(ds.attrs, file_path)
+            metadata["event_dates"] = sorted(parse_event_dates(ds.attrs.get("event_date")))
             if criteria.min_confidence and confidence < criteria.min_confidence:
                 return False, metadata
             if criteria.max_confidence and confidence > criteria.max_confidence:
@@ -155,6 +172,10 @@ def check_file_metadata(file_path, criteria):
                     metadata["annotated_pixel_count"] = pixel_count
                     if pixel_count < criteria.min_annotated_pixel:
                         return False, metadata
+                    # 1 .. min_positive_pixel-1 px: too small to be positive, not hazard-free either
+                    min_pos = criteria.get("min_positive_pixel")
+                    if min_pos and 0 < pixel_count < min_pos:
+                        return False, metadata
                 else:
                     if criteria.min_annotated_pixel > 0:
                         return False, metadata
@@ -166,34 +187,41 @@ def check_file_metadata(file_path, criteria):
 
 
 def filter_files(files, criteria, n_workers=4):
-    """Filter files based on criteria."""
+    """Filter files based on criteria. Returns the kept files and {file: metadata} for them."""
     results = Parallel(n_jobs=n_workers)(
         delayed(check_file_metadata)(f, criteria) 
         for f in tqdm(files, desc="Filtering files")
     )
     
     filtered = [f for f, (ok, _) in zip(files, results) if ok]
+    metas = {f: m for f, (ok, m) in zip(files, results) if ok}
     
     if criteria.min_annotated_pixel:
         logging.info(f"Applied min_annotated_pixel filter: {criteria.min_annotated_pixel}")
     
-    return filtered
+    return filtered, metas
+
+
+def single_event_inventories(metas, min_positive_pixel):
+    """{inventory: event date} for inventories whose positives all carry the same single event date."""
+    dates, qualified = {}, {}
+    for m in metas.values():
+        if m.get("annotated_pixel_count", 0) >= max(min_positive_pixel, 1):
+            dates.setdefault(m["inventory"], []).append(tuple(m["event_dates"]))
+    for inv, per_patch in dates.items():
+        unique = set(per_patch)
+        if len(unique) == 1 and len(next(iter(unique))) == 1:
+            qualified[inv] = next(iter(unique))[0]
+    return qualified
 
 
 def extract_inventory(file_path):
     """Extract inventory name from file path or metadata."""
     try:
         with xr.open_dataset(file_path) as ds:
-            for attr in ['inventory', 'region', 'location']:
-                if attr in ds.attrs:
-                    return str(ds.attrs[attr]).lower()
-    except:
-        pass
-    
-    # Parse from filename
-    filename = re.sub(r"_(s1asc|s1dsc|s2)$", "", file_path.stem.lower())
-    parts = filename.split('_')
-    return parts[0] if parts else 'unknown'
+            return inventory_name(ds.attrs, file_path)
+    except Exception:
+        return inventory_name({}, file_path)
 
 
 def process_patch_ratio(patch_file):
@@ -341,15 +369,31 @@ def stratified_split_with_inventory(patches, coverage, inventory, test_size=0.2,
             logging.info(f"Forcing {len(train_forced)} singleton patches to train")
 
         if len(idx_split) > 0:
-            train_val_idx, test_idx_free = train_test_split(
-                idx_split, test_size=test_size, stratify=stratify, random_state=seed
-            )
+            try:
+                train_val_idx, test_idx_free = train_test_split(
+                    idx_split, test_size=test_size, stratify=stratify, random_state=seed
+                )
+            except ValueError as e:   # e.g. more strata than test patches
+                logging.warning(f"stratified test split impossible ({e}); plain split instead")
+                train_val_idx, test_idx_free = train_test_split(idx_split, test_size=test_size, random_state=seed)
 
             if len(train_val_idx) > 1:
                 stratify_tv = np.array([f"{coverage_free[i]}_{inventory_free[i]}" for i in train_val_idx])
-                train_idx_free, val_idx_free = train_test_split(
-                    train_val_idx, test_size=val_size, stratify=stratify_tv, random_state=seed
-                )
+                # a stratum left with one member cannot be split again: train
+                u_tv, c_tv = np.unique(stratify_tv, return_counts=True)
+                rare_tv = np.isin(stratify_tv, u_tv[c_tv < 2])
+                tv_forced, tv_idx = train_val_idx[rare_tv], train_val_idx[~rare_tv]
+                if len(tv_forced) > 0:
+                    logging.info(f"Forcing {len(tv_forced)} singleton patches to train (train/val split)")
+                try:
+                    train_idx_free, val_idx_free = train_test_split(
+                        tv_idx, test_size=val_size, stratify=stratify_tv[~rare_tv], random_state=seed
+                    )
+                except ValueError as e:
+                    logging.warning(f"stratified val split impossible ({e}); plain split instead")
+                    train_idx_free, val_idx_free = (train_test_split(tv_idx, test_size=val_size, random_state=seed)
+                                                    if len(tv_idx) > 1 else (tv_idx, empty))
+                train_idx_free = np.concatenate([train_idx_free, tv_forced]).astype(int)
             else:
                 train_idx_free, val_idx_free = train_val_idx, empty
         else:
@@ -497,7 +541,7 @@ def map_splits_to_files(files, patch_splits):
     return splits
 
 
-def create_splits_geodataframe(splits, files, metadata):
+def create_splits_geodataframe(splits, files, metadata, event_dates=None):
     """Create GeoDataFrame from cached metadata."""
     ref_sat = list(splits.keys())[0]
     
@@ -521,6 +565,8 @@ def create_splits_geodataframe(splits, files, metadata):
             'lat': meta.get('lat', 0.0),
             'crs_original': meta.get('crs', 'EPSG:4326')
         })
+        if event_dates is not None:
+            records[-1]['event_date'] = event_dates.get(meta.get('inventory'))
     
     df = pd.DataFrame(records)
     
@@ -556,7 +602,7 @@ def save_geodataframe(gdf, output_dir, base_name='patch_locations'):
     logging.info(f"Saved: {file}")
 
 
-def create_splits_json(splits, all_files, metadata, input_dir, output_dir, filename="splits.json"):
+def create_splits_json(splits, all_files, metadata, input_dir, output_dir, filename="splits.json", event_dates=None):
     """
     Create a splits.json file with detailed patch info.
     This function is general and works for single or multiple satellites.
@@ -602,6 +648,9 @@ def create_splits_json(splits, all_files, metadata, input_dir, output_dir, filen
         if pid in metadata:
             entry['pixel_annotated'] = metadata[pid].get('annotated_pixels', 0)
             entry['inventory'] = metadata[pid].get('inventory', 'unknown')
+            if event_dates is not None:
+                # hazard-free patches inherit the inventory's date
+                entry['event_date'] = event_dates.get(entry['inventory'])
         
         result[split_name].append(entry)
 
@@ -614,7 +663,8 @@ def create_splits_json(splits, all_files, metadata, input_dir, output_dir, filen
     logging.info(f"Saved: {output_file}")
 
 
-def create_norm_json(splits, input_dir, output_dir, n_workers, clip_data=True, filename="norm.json"):
+def create_norm_json(splits, input_dir, output_dir, n_workers, clip_data=True, filename="norm.json",
+                     pool=None, metadata=None, min_positive_pixel=0):
     """
     Create a norm.json file with normalization stats for the training set.
     This function is general and works for single or multiple satellites.
@@ -632,6 +682,11 @@ def create_norm_json(splits, input_dir, output_dir, n_workers, clip_data=True, f
     for sat, split_dict in sorted(splits.items()):
         # Get training files
         train_files = split_dict.get('train', [])
+        if pool is not None:
+            # positive = >= min_positive_pixel annotated px, negative = none
+            px = lambda f: metadata.get(file_key(f), {}).get('annotated_pixels', 0)
+            keep = (lambda f: px(f) >= max(min_positive_pixel, 1)) if pool == "positive" else (lambda f: px(f) == 0)
+            train_files = [f for f in train_files if keep(f)]
         if not train_files:
             logging.warning(f"No training files for {sat.upper()}, skipping normalization.")
             continue
@@ -706,12 +761,25 @@ def main(cfg: DictConfig):
 
     # STEP 1: Filter files
     logging.info("[STEP 1] Filtering files...")
-    satellite_files = {}
+    satellite_files, all_metas = {}, {}
     for sat in criteria.satellites:
         files = sorted((input_dir / sat).glob("*.nc"))
         logging.info(f"{sat.upper()}: {len(files)} files found")
-        satellite_files[sat] = filter_files(files, criteria, n_workers)
+        satellite_files[sat], sat_metas = filter_files(files, criteria, n_workers)
+        all_metas.update(sat_metas)
         logging.info(f"{sat.upper()}: {len(satellite_files[sat])} after filtering")
+
+    # STEP 1b: single-event inventories only
+    event_dates = None
+    if criteria.get("single_event_only"):
+        event_dates = single_event_inventories(all_metas, criteria.get("min_positive_pixel") or 0)
+        logging.info(f"Single-event inventories ({len(event_dates)}): {event_dates}")
+        for sat in satellite_files:
+            before = len(satellite_files[sat])
+            satellite_files[sat] = [f for f in satellite_files[sat] if all_metas[f]["inventory"] in event_dates]
+            logging.info(f"{sat.upper()}: {len(satellite_files[sat])} of {before} in single-event inventories")
+    min_pos = criteria.get("min_positive_pixel") or 0
+    norm_pools = cfg_split.get("norm_pools")   # e.g. [positive, negative]
 
     # STEP 2: Unaligned splits (per-satellite)
     logging.info("\n[STEP 2] Creating UNALIGNED splits...")
@@ -729,14 +797,17 @@ def main(cfg: DictConfig):
         
         # Save per-satellite outputs
         sat_dir = output_dir / sat       
-        create_splits_json(splits=splits, all_files=sat_files_dict, metadata=metadata, input_dir=input_dir, output_dir=sat_dir, filename="splits.json")
+        create_splits_json(splits=splits, all_files=sat_files_dict, metadata=metadata, input_dir=input_dir, output_dir=sat_dir, filename="splits.json", event_dates=event_dates)
         # Create norm json with absolute paths in splits
-        create_norm_json(splits, input_dir, sat_dir, n_workers, clip_data=clip_data, filename="norm.json")
+        for pool in (norm_pools or [None]):
+            create_norm_json(splits, input_dir, sat_dir, n_workers, clip_data=clip_data,
+                             filename="norm.json" if pool is None else f"norm_{pool}.json",
+                             pool=pool, metadata=metadata, min_positive_pixel=min_pos)
         
         # GeoDataFrame
         if cfg_split.get('export_geodataframe', True):
             try:
-                gdf = create_splits_geodataframe(splits, {sat: files}, metadata)
+                gdf = create_splits_geodataframe(splits, {sat: files}, metadata, event_dates)
                 save_geodataframe(gdf, sat_dir)
             except Exception as e:
                 logging.error(f"GeoDataFrame error: {e}")
@@ -750,15 +821,18 @@ def main(cfg: DictConfig):
         aligned_splits = map_splits_to_files(aligned_files, patch_splits)
         
         # Create global files
-        create_splits_json(aligned_splits,aligned_files, metadata, input_dir, output_dir, filename="splits_aligned.json")
+        create_splits_json(aligned_splits,aligned_files, metadata, input_dir, output_dir, filename="splits_aligned.json", event_dates=event_dates)
         
         # Create norm json with absolute paths in splits  
-        create_norm_json(aligned_splits, input_dir, output_dir, n_workers, clip_data=clip_data, filename="norm_aligned.json")
+        for pool in (norm_pools or [None]):
+            create_norm_json(aligned_splits, input_dir, output_dir, n_workers, clip_data=clip_data,
+                             filename="norm_aligned.json" if pool is None else f"norm_{pool}_aligned.json",
+                             pool=pool, metadata=metadata, min_positive_pixel=min_pos)
         
         # GeoDataFrame
         if cfg_split.get('export_geodataframe', True):
             try:
-                gdf = create_splits_geodataframe(aligned_splits, aligned_files, metadata)
+                gdf = create_splits_geodataframe(aligned_splits, aligned_files, metadata, event_dates)
                 save_geodataframe(gdf, output_dir, "patch_locations_aligned")
             except Exception as e:
                 logging.error(f"GeoDataFrame error: {e}")
